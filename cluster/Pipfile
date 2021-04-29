@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 python-openstackclient = "*"
+toml = "*"
+python-heatclient = "*"
 
 [dev-packages]
 
