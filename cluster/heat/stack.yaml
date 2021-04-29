@@ -44,6 +44,27 @@ resources:
           protocol: tcp
           port_range_min: 22
           port_range_max: 22
+  docker_swarm_secgroup:
+    # https://docs.docker.com/engine/swarm/swarm-tutorial/#open-protocols-and-ports-between-the-hosts
+    type: OS::Neutron::SecurityGroup
+    properties:
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 2377
+          port_range_max: 2377
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 7946
+          port_range_max: 7946
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: udp
+          port_range_min: 7946
+          port_range_max: 7946
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: udp
+          port_range_min: 4789
+          port_range_max: 4789
 
   manager:
     # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Nova::Server
@@ -56,6 +77,7 @@ resources:
       # availability_zone: { get_param: availability_zone }
       security_groups:
       - { get_resource: ssh_secgroup }
+      - { get_resource: docker_swarm_secgroup }
       networks:
         - allocate_network: auto
 
@@ -70,6 +92,7 @@ resources:
       # availability_zone: { get_param: availability_zone }
       security_groups:
       - { get_resource: ssh_secgroup }
+      - { get_resource: docker_swarm_secgroup }
       networks:
         - allocate_network: auto
 

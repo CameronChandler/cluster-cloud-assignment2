@@ -1,0 +1,16 @@
+- name: determine swarm status
+  shell: >
+    docker info | egrep 'Swarm: ' | cut -d ' ' -f3
+  register: swarm_status
+
+- name: create swarm_worker_up group
+  add_host: hostname="{{ item }}" groups=swarm_worker_up
+  with_items: "{{ play_hosts }}"
+  when: "'active' in swarm_status.stdout_lines"
+  run_once: true
+
+- name: create swarm_worker_bootstrap group
+  add_host: hostname="{{ item }}" groups=swarm_worker_bootstrap
+  with_items: "{{ play_hosts }}"
+  when: "'active' not in swarm_status.stdout_lines"
+  run_once: true

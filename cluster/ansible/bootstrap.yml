@@ -1,77 +1,20 @@
 # Pulled from DigitalOcean tutorial here: https://www.digitalocean.com/community/tutorials/how-to-use-ansible-to-install-and-set-up-docker-on-ubuntu-18-04
 ---
-# Install Docker on all hosts
-- hosts: all
-  become: true
-  vars_files:
-    - vars/default.yml
-  
-  tasks:
-    - name: Install aptitude
-      apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
-    - name: Install required system packages
-      apt: name={{ item }} state=latest update_cache=yes
-      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools' ]
-    - name: Add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/debian/gpg
-        state: present
-    - name: Add Docker Repository
-      apt_repository:
-        repo: deb https://download.docker.com/linux/debian buster stable
-        state: present
-    - name: Install containerd.io container runtime
-      apt: update_cache=yes name=containerd.io state=latest
-    - name: Update APT and install Docker CE
-      apt: update_cache=yes name=docker-ce state=latest
-    
-    - name: Install Docker Module for Python
-      pip:
-        name: docker
 
 # Populate host groups with:
 # - Manager nodes that are already / are not yet running docker swarm
 # - Worker nodes that are already / are not yet running docker swarm
 - hosts: manager
   become: true
-  vars_files:
-    - vars/default.yml
-  
-  tasks:
-    - name: determine swarm status
-      shell: >
-        docker info | egrep 'Swarm: ' | cut -d ' ' -f3
-      register: swarm_status
-    - name: create swarm_manager_up group
-      add_host: hostname="{{ item }}" groups=swarm_manager_up
-      with_items: "{{ play_hosts }}"
-      when: "'active' in swarm_status.stdout_lines"
-      run_once: true
-    - name: create swarm_manager_bootstrap group
-      add_host: hostname="{{ item }}" groups=swarm_manager_bootstrap
-      with_items: "{{ play_hosts }}"
-      when: "'active' not in swarm_status.stdout_lines"
-      run_once: true
+  roles:
+    - common
+    - swarm-manager
 
 - hosts: worker
   become: true
-  tasks:
-    - name: determine swarm status
-      shell: >
-        docker info | egrep 'Swarm: ' | cut -d ' ' -f3
-      register: swarm_status
-
-    - name: create swarm_worker_up group
-      add_host: hostname="{{ item }}" groups=swarm_worker_up
-      with_items: "{{ play_hosts }}"
-      when: "'active' in swarm_status.stdout_lines"
-      run_once: true
-
-    - name: create swarm_worker_bootstrap group
-      add_host: hostname="{{ item }}" groups=swarm_worker_bootstrap
-      with_items: "{{ play_hosts }}"
-      when: "'active' not in swarm_status.stdout_lines"
-      run_once: true
+  roles:
+    - common
+    - swarm-worker
 
 - hosts: swarm_manager_bootstrap[0]
   become: true
