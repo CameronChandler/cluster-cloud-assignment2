@@ -49,22 +49,31 @@ resources:
     type: OS::Neutron::SecurityGroup
     properties:
       rules:
-        - remote_ip_prefix: 0.0.0.0/0
+        - remote_group_id: { get_resource: ssh_secgroup }
           protocol: tcp
           port_range_min: 2377
           port_range_max: 2377
-        - remote_ip_prefix: 0.0.0.0/0
+        - remote_group_id: { get_resource: ssh_secgroup }
           protocol: tcp
           port_range_min: 7946
           port_range_max: 7946
-        - remote_ip_prefix: 0.0.0.0/0
+        - remote_group_id: { get_resource: ssh_secgroup }
           protocol: udp
           port_range_min: 7946
           port_range_max: 7946
-        - remote_ip_prefix: 0.0.0.0/0
+        - remote_group_id: { get_resource: ssh_secgroup }
           protocol: udp
           port_range_min: 4789
           port_range_max: 4789
+
+  couchdb_secgroup:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 5984
+          port_range_max: 5984
 
   manager:
     # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Nova::Server
@@ -78,6 +87,7 @@ resources:
       security_groups:
       - { get_resource: ssh_secgroup }
       - { get_resource: docker_swarm_secgroup }
+      - { get_resource: couchdb_secgroup }
       networks:
         - allocate_network: auto
 
@@ -93,6 +103,7 @@ resources:
       security_groups:
       - { get_resource: ssh_secgroup }
       - { get_resource: docker_swarm_secgroup }
+      - { get_resource: couchdb_secgroup }
       networks:
         - allocate_network: auto
 

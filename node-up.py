@@ -1,0 +1,198 @@
+import asyncio
+import json
+from getpass import getpass
+from sys import argv
+from os import environ, path
+import os
+from pprint import pprint
+import subprocess
+import argparse
+
+SCRIPT=path.realpath(__file__)
+ROOT=path.dirname(SCRIPT)
+
+PATHS = {
+  'ansible': path.join(ROOT, 'cluster', 'ansible'),
+  'heat': path.join(ROOT, 'cluster', 'heat'),
+  'clouds': path.join(ROOT, 'clouds.yaml'),
+  'couch': path.join(ROOT, 'docker', 'couch')
+}
+
+from log import *
+
+class OpenStackClient:
+  def __init__(self, cloud_name, stack_name):
+    self.__cloud_name = cloud_name
+    self.__stack_name = stack_name
+    self.__password = None
+    self.__known_stacks = None
+    self.__stack_outputs = None
+    self.__docker_context_name = None
+
+  @property
+  def password(self):
+    if not self.__password:
+      self.__password = environ['OS_PASSWORD'] if 'OS_PASSWORD' in environ else None
+    if not self.__password:
+      self.__password = getpass(f"Enter password for {self.__cloud_name}: ")
+    return self.__password
+
+
+  async def stack_exists(self, name):
+    if not self.__known_stacks:
+      trace('Fetching stack list')
+      cmd = [
+      'openstack',
+      '--os-cloud', self.__cloud_name,
+      'stack', 'list',
+      '-f', 'json'
+      ]
+      proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        env=environ.copy() | { 'OS_PASSWORD' : self.password },
+        stdout=asyncio.subprocess.PIPE
+      )
+      stdout, _ = await proc.communicate()
+      stdout = stdout.decode()
+
+      js = json.loads(stdout)
+      self.__known_stacks = { s['Stack Name'] : s for s in js }
+    pprint(self.__known_stacks)
+    return name in self.__known_stacks
+
+  async def create_stack(self, template, params):
+    action = 'create'
+    if await self.stack_exists(self.__stack_name):
+      action = 'update'
+      if input('Stack already exists, update it? (y/n): ') != 'y':
+        return
+    trace(f'{"updating" if action == "update" else "creating"} stack {self.__stack_name}')
+    cmd = [
+      'openstack',
+      '--os-cloud', self.__cloud_name,
+      'stack', action,
+      '-f', 'json',
+      '--wait',
+      '-t', template,
+      self.__stack_name
+    ] + [i for key, value in params.items() for i in ['--parameter', f'{key}={value}']]
+    trace('Calling for effect: ' + ' '.join(cmd))
+    proc = await asyncio.create_subprocess_exec(
+      *cmd,
+      env=environ.copy() | { 'OS_PASSWORD' : self.password },
+      stdout=asyncio.subprocess.PIPE
+    )
+
+    assert(await proc.wait() == 0)
+  
+  @traced('Getting stack creation outputs')
+  async def get_outputs(self, name):
+    if not self.__stack_outputs:
+      cmd = [
+        'openstack',
+        '--os-cloud', self.__cloud_name,
+        'stack', 'output', 'show',
+        '-f', 'json',
+        '--all',
+        name
+      ]
+      proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        env=environ.copy() | { 'OS_PASSWORD' : self.password }
+      )
+
+      stdout, _ = await proc.communicate()
+      stdout = stdout.decode()
+      stdout = json.loads(stdout)
+      for k in stdout:
+        stdout[k] = json.loads(stdout[k])
+      self.__stack_outputs = stdout
+    
+    return self.__stack_outputs
+  
+  @prompt('Generate hosts file')
+  @traced()
+  async def write_hosts_file(self):
+    outputs = await self.get_outputs(self.__stack_name)
+
+    pprint(outputs)
+
+    trace('Writing hosts file')
+    with open(path.join(PATHS['ansible'], 'generated_hosts.ini'), 'w') as hf:
+      hf.write('[manager]\n')
+      hf.write(f'{outputs["manager_ip"]["output_value"]} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_python_interpreter=python3\n')
+      hf.write('\n')
+      hf.write('[worker]\n')
+      hf.write(f'{outputs["worker_ip"]["output_value"]} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_python_interpreter=python3\n')
+      hf.write('\n')
+
+  @prompt('Run ansible')
+  @traced()
+  async def run_ansible(self):
+    proc = subprocess.Popen([
+      'ansible-playbook',
+      # Ansible doesn't handle trying to do auth for multiple servers concurrently very well
+      # See https://github.com/ansible/ansible/issues/25068
+      '--forks', '1',  
+      '-i', path.join(PATHS['ansible'], 'generated_hosts.ini'),
+      path.join(PATHS['ansible'], 'bootstrap.yml')
+    ])
+    proc.wait()
+  
+  @property
+  def docker_context_name(self):
+    return self.__cloud_name + '_' + self.__stack_name
+  
+  # TODO(alaroldai): If docker context already exists, update it instead of deleting
+  @prompt('Re-generate docker context')
+  @traced('Creating docker context', 'docker')
+  async def setup_docker_context(self):
+    trace(f'Creating docker context {self.docker_context_name}')
+    outputs = await self.get_outputs(self.__stack_name)
+    manager = outputs['manager_ip']['output_value']
+    subprocess.call([
+      'docker', 'context', 'create',
+      self.docker_context_name,
+      '--docker', f'host=ssh://debian@{manager}', '--description',
+      'Generated by COMP90024 node-up.py script'
+    ])
+    subprocess.call(['docker', 'context', 'use', self.docker_context_name])
+  
+  @prompt('Deploy docker stack')
+  @traced('Deploying docker stack', 'docker')
+  async def deploy_docker_stack(self):
+    # These have to be done sequentially, so there's no point in using asyncio here
+    subprocess.call(['docker', 'context', 'use', self.docker_context_name])
+
+    # Build required containers
+    subprocess.call([
+      'docker', 'build', '-t', 'comp90024/couch_wrapper', PATHS['couch']
+    ])
+
+    # Deploy the stack
+    subprocess.call([
+      'docker', 'stack', 'deploy', '-c', path.join(PATHS['couch'], 'docker-compose.yaml'), self.__stack_name
+    ])
+
+  async def configure_couch_cluster(self):
+    pass
+
+async def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--cloud', default='nectar-private')
+  parser.add_argument('--stack', default='test')
+  args = parser.parse_args()
+
+  client = OpenStackClient(args.cloud, args.stack)
+  await client.create_stack(path.join(PATHS['heat'], 'stack.yaml'), {'key_name': 'alaroldai_haliax'})
+  await client.write_hosts_file()
+  await client.run_ansible()
+  await client.setup_docker_context()
+  await client.deploy_docker_stack()
+
+  await client.configure_couch_cluster()
+
+
+if __name__ == '__main__':
+  asyncio.run(main())

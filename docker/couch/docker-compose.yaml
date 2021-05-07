@@ -1,0 +1,19 @@
+version: "3.9"
+
+
+services:
+  couch:
+    image: "comp90024/couch_wrapper"
+    deploy:
+      replicas: 3
+    environment:
+      - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
+      - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99" -name couchdb@{{.Task.Name}}
+      - NODENAME={{.Task.Name}}
+    ports:
+      - "5984:5984"
+# Theoretically, this should do the same thing as in the Dockerfile, but without the need to build a new image
+# Doesn't seem to work though...
+# configs:
+#   couch_config:
+#     file: ./couch_config.ini
