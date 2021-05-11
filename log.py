@@ -69,14 +69,14 @@ def traced(s=None, prefix=None):
       async def decorated(*args, **kwargs):
         trace(s or f.__name__)
         with indent(2, prefix=prefix or f.__name__):
-          await f(*args, **kwargs)
+          return await f(*args, **kwargs)
       return decorated
     else:
       @wraps(f)
       def decorated(*args, **kwargs):
         trace(s or f.__name__)
         with indent(2, prefix=prefix or f.__name__):
-          f(*args, **kwargs)
+          return f(*args, **kwargs)
       return decorated
   return decorator
 
@@ -85,15 +85,15 @@ def prompt(s):
     if isasync(f):
       @wraps(f)
       async def decorated(*args, **kwargs):
-        if input(s + '? (y/n)') != 'y':
+        if input(s + '? (y/n): ') != 'y':
           return
-        await f(*args, **kwargs)
+        return await f(*args, **kwargs)
       return decorated
     else:
       @wraps(f)
       def decorated(*args, **kwargs):
-        if input(s + '? (y/n)') != 'y':
+        if input(s + '? (y/n): ') != 'y':
           return
-        f(*args, **kwargs)
+        return f(*args, **kwargs)
       return decorated
   return decorator

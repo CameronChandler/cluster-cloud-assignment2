@@ -1,0 +1,66 @@
+version: "3.9"
+
+# networks:
+#   couch:
+
+services:
+  nginx:
+    image: alaroldai/comp90024_nginx_wrapper
+    build: ./nginx
+    ports:
+      - 5984:5984
+      - 6984:6984
+
+  # couch1:
+  #   image: alaroldai/comp90024_couch_wrapper
+  #   build: ./couch
+  #   environment:
+  #     - COUCHDB_USER=admin
+  #     - COUCHDB_PASSWORD=badpassword
+  #     - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
+  #     - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99"
+  #     - NODENAME=couch1.local
+  #   ports:
+  #     - 15984:5984
+  #   networks:
+  #     couch:
+  #       aliases:
+  #         - couch1.local
+
+  # couch2:
+  #   image: alaroldai/comp90024_couch_wrapper
+  #   build: ./couch
+  #   environment:
+  #     - COUCHDB_USER=admin
+  #     - COUCHDB_PASSWORD=badpassword
+  #     - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
+  #     - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99"
+  #     - NODENAME=couch2.local
+  #   ports:
+  #     - 25984:5984
+  #   networks:
+  #     couch:
+  #       aliases:
+  #         - couch2.local
+
+  # couch3:
+  #   image: alaroldai/comp90024_couch_wrapper
+  #   build: ./couch
+  #   environment:
+  #     - COUCHDB_USER=admin
+  #     - COUCHDB_PASSWORD=badpassword
+  #     - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
+  #     - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99"
+  #     - NODENAME=couch3.local
+  #   ports:
+  #     - 35984:5984
+  #   networks:
+  #     couch:
+  #       aliases:
+  #         - couch3.local
+
+# Theoretically, this should do the same thing as in the Dockerfile, but without the need to build a new image
+# Doesn't seem to work though...
+# configs:
+#   couch_config:
+#     file: ./couch_config.ini

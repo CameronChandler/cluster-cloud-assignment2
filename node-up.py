@@ -7,6 +7,8 @@ import os
 from pprint import pprint
 import subprocess
 import argparse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from functools import lru_cache
 
 SCRIPT=path.realpath(__file__)
 ROOT=path.dirname(SCRIPT)
@@ -15,7 +17,9 @@ PATHS = {
   'ansible': path.join(ROOT, 'cluster', 'ansible'),
   'heat': path.join(ROOT, 'cluster', 'heat'),
   'clouds': path.join(ROOT, 'clouds.yaml'),
-  'couch': path.join(ROOT, 'docker', 'couch')
+  'stack': path.join(ROOT, 'docker', 'stack'),
+  'couch': path.join(ROOT, 'docker', 'stack', 'couch'),
+  'nginx': path.join(ROOT, 'docker', 'stack', 'nginx')
 }
 
 from log import *
@@ -28,6 +32,17 @@ class OpenStackClient:
     self.__known_stacks = None
     self.__stack_outputs = None
     self.__docker_context_name = None
+    self.__jinja2_env = Environment(
+      loader=FileSystemLoader(ROOT),
+      autoescape=select_autoescape(['yaml', 'html', 'xml'])
+    )
+  
+  @lru_cache
+  def load_template(self, path):
+    return self.__jinja2_env.get_template(path)
+  
+  def render_template(self, path, **kwargs):
+    return self.load_template(path).render(**kwargs)
 
   @property
   def password(self):
@@ -35,8 +50,7 @@ class OpenStackClient:
       self.__password = environ['OS_PASSWORD'] if 'OS_PASSWORD' in environ else None
     if not self.__password:
       self.__password = getpass(f"Enter password for {self.__cloud_name}: ")
-    return self.__password
-
+    return self.__password    
 
   async def stack_exists(self, name):
     if not self.__known_stacks:
@@ -108,6 +122,8 @@ class OpenStackClient:
       for k in stdout:
         stdout[k] = json.loads(stdout[k])
       self.__stack_outputs = stdout
+
+    pprint(self.__stack_outputs)
     
     return self.__stack_outputs
   
@@ -116,6 +132,8 @@ class OpenStackClient:
   async def write_hosts_file(self):
     outputs = await self.get_outputs(self.__stack_name)
 
+    pprint(self.__stack_outputs)
+    outputs = self.__stack_outputs
     pprint(outputs)
 
     trace('Writing hosts file')
@@ -159,24 +177,134 @@ class OpenStackClient:
     ])
     subprocess.call(['docker', 'context', 'use', self.docker_context_name])
   
+  @prompt('Deploy docker registry service')
+  @traced('Deploying docker registry service', 'docker')
+  async def deploy_registry(self):
+    subprocess.call(['docker', 'service', 'create', '--name', 'registry', '-p', '5000:5000', 'registry:2'])
+
   @prompt('Deploy docker stack')
   @traced('Deploying docker stack', 'docker')
   async def deploy_docker_stack(self):
-    # These have to be done sequentially, so there's no point in using asyncio here
-    subprocess.call(['docker', 'context', 'use', self.docker_context_name])
-
     # Build required containers
-    subprocess.call([
-      'docker', 'build', '-t', 'comp90024/couch_wrapper', PATHS['couch']
-    ])
+    await asyncio.gather(
+      (
+        await asyncio.create_subprocess_exec(
+          'docker', 'build', '-t', 'comp90024/' + p, PATHS[p]
+        )
+      ).wait()
+      for p in ('couch', 'nginx')
+    )
+      
+    # Load the stack template
+    # compose = self.render_template(path.join(PATHS['couch'], 'docker-compose.yaml'))
 
     # Deploy the stack
-    subprocess.call([
-      'docker', 'stack', 'deploy', '-c', path.join(PATHS['couch'], 'docker-compose.yaml'), self.__stack_name
-    ])
+    proc = subprocess.Popen(
+      [
+        'docker', 'stack', 'deploy', '-c', path.join(PATHS['stack'], 'docker-compose.yaml'), self.__stack_name
+      ],
+    )
+    proc.wait()
+  
+  async def cleanup_container_by_name(self, name):
+    stdout, _ = await (
+        await asyncio.create_subprocess_exec(
+          'docker', 'ps', '--all', '--filter', f'name={name}', '--quiet',
+          stdout=asyncio.subprocess.PIPE
+        )
+      ).communicate()
+    stdout = stdout.decode()
 
-  async def configure_couch_cluster(self):
-    pass
+    if stdout:
+      await (
+        await asyncio.create_subprocess_exec(
+          'docker', 'stop', name
+        )
+      ).wait()
+      await (
+        await asyncio.create_subprocess_exec(
+          'docker', 'rm', name
+        )
+      ).wait()
+
+  async def build_couch_container(self):
+    await (
+      await asyncio.create_subprocess_exec('docker', 'build', '-t', 'comp90024/couch_wrapper', PATHS['couch'])
+    ).wait()
+  
+  def couchdb_container_name(self, address):
+    return f'couchdb{address}'
+
+  async def deploy_couch(self, address, user, password, cookie):
+    print(f'deploying {self.couchdb_container_name(address)}')
+    await (
+      await asyncio.create_subprocess_exec(
+        'docker', 'create',
+        '--name', self.couchdb_container_name(address),
+        '--env',  f'COUCHDB_USER={user}',
+        '--env',  f'COUCHDB_PASSWORD={password}',
+        '--env',  f'COUCHDB_SECRET={cookie}',
+        '--env',  f'ERL_FLAGS=-setcookie "{cookie}" -name "couchdb@{address}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200',
+        'comp90024/couch_wrapper:latest'
+      )
+    ).wait()
+    await (
+      await asyncio.create_subprocess_exec(
+        'docker', 'start', self.couchdb_container_name(address)
+      )
+    ).wait()
+  
+  async def connect_couch_cluster(self):
+    proc = subprocess.Popen([
+      'ansible-playbook',
+      '--forks', '1',  
+      '-i', path.join(PATHS['ansible'], 'generated_hosts.ini'),
+      path.join(PATHS['ansible'], 'couch-up.yml')
+    ])
+    proc.wait()
+
+  @prompt('Deploy couch (without service)')
+  @traced('Deploying couch')
+  async def deploy_couch_no_service(self):
+    # Assumes that we're already using the cluster's docker context
+    nodes = ('172.17.0.4', '172.17.0.3', '172.17.0.2')
+    # Stop any running containers
+    await asyncio.gather(*[
+      self.cleanup_container_by_name(self.couchdb_container_name(node)) for node in nodes
+    ])
+    await self.build_couch_container()
+    for node in sorted(nodes):
+      await self.deploy_couch(node, 'admin', 'answering_railcar', 'a192aeb9904e6590849337933b000c99')
+  
+    # Connecting the couch cluster together requires access to its network,
+    # so we use ansible to run a shell script on the main node
+    await self.connect_couch_cluster()
+
+  @prompt('Deploy nginx (without service)')
+  @traced('Deploying nginx')
+  async def deploy_nginx_no_service(self):
+    if not await (
+        await asyncio.create_subprocess_exec(
+          'docker', 'build', '-t', 'comp90024/nginx', PATHS['nginx']
+        )
+      ).wait():
+      warning('Failed to build nginx image')
+
+    await self.cleanup_container_by_name('nginx')
+
+    if not await (
+        await asyncio.create_subprocess_exec(
+          'docker', 'create', '--name', 'nginx', '-p', '6984:6984', 'comp90024/nginx:latest',
+        )
+      ).wait():
+      warning('Failed to create nginx container')
+
+    if not await (
+        await asyncio.create_subprocess_exec(
+          'docker', 'start', 'nginx',
+        )
+      ).wait():
+      fatal('Failed to start nginx')
 
 async def main():
   parser = argparse.ArgumentParser()
@@ -189,9 +317,8 @@ async def main():
   await client.write_hosts_file()
   await client.run_ansible()
   await client.setup_docker_context()
-  await client.deploy_docker_stack()
-
-  await client.configure_couch_cluster()
+  await client.deploy_couch_no_service()
+  await client.deploy_nginx_no_service()
 
 
 if __name__ == '__main__':

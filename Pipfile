@@ -8,6 +8,8 @@ python-openstackclient = "*"
 toml = "*"
 python-heatclient = "*"
 openstacksdk = "*"
+jinja2 = "*"
+docker = "*"
 
 [dev-packages]
 
