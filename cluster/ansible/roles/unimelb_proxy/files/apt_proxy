@@ -1,0 +1,3 @@
+Acquire::http::Proxy "http://wwwproxy.unimelb.edu.au:8000";
+Acquire::https::Proxy "http://wwwproxy.unimelb.edu.au:8000";
+Acquire::ftp::Proxy "http://wwwproxy.unimelb.edu.au:8000";

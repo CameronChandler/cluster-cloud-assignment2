@@ -1,7 +1,9 @@
 version: "3.9"
 
-# networks:
-#   couch:
+networks:
+  couch:
+    driver: overlay
+
 
 services:
   nginx:
@@ -11,53 +13,47 @@ services:
       - 5984:5984
       - 6984:6984
 
-  # couch1:
-  #   image: alaroldai/comp90024_couch_wrapper
-  #   build: ./couch
-  #   environment:
-  #     - COUCHDB_USER=admin
-  #     - COUCHDB_PASSWORD=badpassword
-  #     - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
-  #     - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99"
-  #     - NODENAME=couch1.local
-  #   ports:
-  #     - 15984:5984
-  #   networks:
-  #     couch:
-  #       aliases:
-  #         - couch1.local
+  couch1:
+    image: alaroldai/comp90024_couch_wrapper
+    build: ./couch
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=answering_railcar
+      - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
+      - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99" -name couchdb@172.17.0.5 -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
+      - NODENAME=172.17.0.5
+    networks:
+      couch:
+        aliases:
+          - 172.17.0.5
 
-  # couch2:
-  #   image: alaroldai/comp90024_couch_wrapper
-  #   build: ./couch
-  #   environment:
-  #     - COUCHDB_USER=admin
-  #     - COUCHDB_PASSWORD=badpassword
-  #     - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
-  #     - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99"
-  #     - NODENAME=couch2.local
-  #   ports:
-  #     - 25984:5984
-  #   networks:
-  #     couch:
-  #       aliases:
-  #         - couch2.local
+    couch2:
+    image: alaroldai/comp90024_couch_wrapper
+    build: ./couch
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=answering_railcar
+      - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
+      - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99" -name couchdb@172.17.0.6 -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
+      - NODENAME=172.17.0.6
+    networks:
+      couch:
+        aliases:
+          - 172.17.0.6
 
-  # couch3:
-  #   image: alaroldai/comp90024_couch_wrapper
-  #   build: ./couch
-  #   environment:
-  #     - COUCHDB_USER=admin
-  #     - COUCHDB_PASSWORD=badpassword
-  #     - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
-  #     - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99"
-  #     - NODENAME=couch3.local
-  #   ports:
-  #     - 35984:5984
-  #   networks:
-  #     couch:
-  #       aliases:
-  #         - couch3.local
+    couch3:
+    image: alaroldai/comp90024_couch_wrapper
+    build: ./couch
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=answering_railcar
+      - COUCHDB_SECRET=a192aeb9904e6590849337933b000c99
+      - ERL_FLAGS=-setcookie "a192aeb9904e6590849337933b000c99" -name couchdb@172.17.0.7 -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
+      - NODENAME=172.17.0.57
+    networks:
+      couch:
+        aliases:
+          - 172.17.0.7
 
 # Theoretically, this should do the same thing as in the Dockerfile, but without the need to build a new image
 # Doesn't seem to work though...

@@ -4,17 +4,14 @@
 # Populate host groups with:
 # - Manager nodes that are already / are not yet running docker swarm
 # - Worker nodes that are already / are not yet running docker swarm
-- hosts: manager
+- hosts: all
   become: true
+  environment:
+    http_proxy: 'http://wwwproxy.unimelb.edu.au:8000'
+    https_proxy: 'http://wwwproxy.unimelb.edu.au:8000'
   roles:
     - common
     - swarm-manager
-
-- hosts: worker
-  become: true
-  roles:
-    - common
-    - swarm-worker
 
 - hosts: swarm_manager_bootstrap[0]
   become: true

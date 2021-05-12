@@ -1,0 +1,16 @@
+- name: Set up proxy
+  copy:
+    src: environment
+    dest: /etc/environment
+- copy:
+    src: apt_proxy
+    dest: /etc/apt/apt.conf.d/01proxy
+- file: path=/etc/systemd/system/docker.service.d state=directory
+- file: path=/etc/systemd/system/docker.service.d state=directory
+- copy:
+    src: docker_daemon_proxy
+    dest: /etc/systemd/system/docker.service.d/http-proxy.conf
+- file: path=/home/debian/.docker/ state=directory
+- copy:
+    src: docker_build_config
+    dest: /home/debian/.docker/config.json

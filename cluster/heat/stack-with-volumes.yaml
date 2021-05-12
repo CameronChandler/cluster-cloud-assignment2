@@ -17,7 +17,7 @@ parameters:
   flavor:
     type: string
     description: Flavor
-    default: t3.xsmall
+    default: uom.mse.1c4g
     constraints:
       - custom_constraint: nova.flavor
         description: Must be an existing flavor
@@ -103,7 +103,7 @@ resources:
       networks:
         - allocate_network: auto
 
-  worker1:
+  worker:
     # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Nova::Server
     type: OS::Nova::Server
     properties:
@@ -118,21 +118,21 @@ resources:
       - { get_resource: couchdb_secgroup }
       networks:
         - allocate_network: auto
-  worker2:
-    # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Nova::Server
-    type: OS::Nova::Server
-    properties:
-      key_name: { get_param: key_name }
-      image: { get_param: image }
-      flavor: { get_param: flavor }
-      tags: ['docker-worker']
-      # availability_zone: { get_param: availability_zone }
-      security_groups:
-      - { get_resource: ssh_secgroup }
-      - { get_resource: docker_swarm_secgroup }
-      - { get_resource: couchdb_secgroup }
-      networks:
-        - allocate_network: auto
+  # worker2:
+  #   # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Nova::Server
+  #   type: OS::Nova::Server
+  #   properties:
+  #     key_name: { get_param: key_name }
+  #     image: { get_param: image }
+  #     flavor: { get_param: flavor }
+  #     tags: ['docker-worker']
+  #     # availability_zone: { get_param: availability_zone }
+  #     security_groups:
+  #     - { get_resource: ssh_secgroup }
+  #     - { get_resource: docker_swarm_secgroup }
+  #     - { get_resource: couchdb_secgroup }
+  #     networks:
+  #       - allocate_network: auto
   
   # # Not sure how to map OpenStack volumes to Docker containers in a swarm yet
   # couch_vol1:
