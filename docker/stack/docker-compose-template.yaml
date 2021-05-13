@@ -12,6 +12,8 @@ services:
     ports:
       - 5984:5984
       - 6984:6984
+      - 80:80
+      - 443:443
     networks:
       couch:
 

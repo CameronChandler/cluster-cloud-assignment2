@@ -266,6 +266,13 @@ class OpenStackClient:
         '-c', 'docker-compose.yaml',
         'test',
       ])
+    info('Sleeping 15s to give couch containers time to start')
+    time.sleep(15)
+  
+  @prompt('Link CouchDB cluster')
+  @traced('linking couchdb cluster', 'docker')
+  def link_couch(self):
+    with chdir(self.__paths['stack']):
       subprocess.call([
         'docker',
         'build',
@@ -275,8 +282,6 @@ class OpenStackClient:
         'comp90024/couch_link',
         'couch-link'
       ])
-      info('Sleeping 15s to give couch containers time to start')
-      time.sleep(15)
       subprocess.call([
         'docker',
         'run',
@@ -304,6 +309,7 @@ def main():
   client.run_ansible()
   client.setup_docker_context()
   client.deploy_docker_stack()
+  client.link_couch()
 
 if __name__ == '__main__':
   main()
