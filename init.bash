@@ -12,4 +12,4 @@ if [ -z "${OS_PASSWORD}" ]; then
   OS_PASSWORD=$(read -s -p 'OpenStack password:')
 fi
 
-pipenv run python node-up.py $@
+pipenv run python node_up.py $@

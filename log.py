@@ -32,6 +32,9 @@ def indent(width, prefix=None):
     INDENT_WIDTH -= width
     PREFIX = head
 
+def should_log(level):
+  return level > LOG_LEVEL
+
 def log(level, *args, **kwargs):
   if level > LOG_LEVEL:
     return
