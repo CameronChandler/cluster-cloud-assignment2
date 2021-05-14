@@ -291,6 +291,19 @@ class OpenStackClient:
         'comp90024/couch_link'
       ])
 
+    @prompt('Deploy CouchDB Views')
+    @traced('Deploying CouchDB Views')
+    def deploy_views(self):
+      for view in os.listdir('couchdb/views'):
+        with open(view, 'r') as f:
+          viewstring = f.read()
+          subprocess.call([
+            'curl',
+            '-X', 'PUT',
+            f'http://admin:password@{}:5984/db/_design/my_ddoc',
+            '-d ', viewstring
+          ])
+
 def main():
   parser = gen_argparser()
   args = parser.parse_args()
@@ -310,6 +323,7 @@ def main():
   client.setup_docker_context()
   client.deploy_docker_stack()
   client.link_couch()
+  client.deploy_views()
 
 if __name__ == '__main__':
   main()
