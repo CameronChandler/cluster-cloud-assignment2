@@ -1,6 +1,9 @@
 import werkzeug
 werkzeug.cached_property = werkzeug.utils.cached_property
 from flask import Flask, Blueprint, jsonify, request
+import flask.scaffold
+flask.helpers._endpoint_from_view_func = flask.scaffold._endpoint_from_view_func
+import flask_restful
 from flask_restplus import Api, Resource, fields
 from werkzeug.utils import cached_property
 import couchdb
@@ -59,6 +62,14 @@ class Database:
                 "sydney": 4.0,
                 "darwin": 3.0,
                 "perth": 5.0,
+            },
+
+            'median_income_by_city': {
+                "melbourne": 34.0,
+                "adelaide": 32.0,
+                "sydney": 50.0,
+                "darwin": 25.0,
+                "perth": 28.0,
             }
         }
     
@@ -70,11 +81,17 @@ db = Database()
 def fetch_tag(tag, datasets):
     return tag
 
+#@app.route('/graphkeys'):
+#   {'x_label': ...,
+#    'x_couchDB': ...,
+#    'x_dropdown': ...,}
+
 @app.route('/testdata')
 def testdata():
     xattr = request.args.get('xattr') or 'unemployment_pct_by_city'
     yattr = request.args.get('yattr') or 'word_lengths_by_city'
     tags = request.args.get('tag') or ['city_name']
+    tags = [tags] if isinstance(tags, str) else tags
     
     print(f'xattr: {xattr}')
     print(f'yattr: {yattr}')
@@ -88,7 +105,7 @@ def testdata():
     data = [
         {
             'tags': {
-                tag : fetch_tag(tag, { xattr: xdata[city], yattr: ydata[city] })
+                tag : fetch_tag(tag, { xattr: xdata[city], yattr: ydata[city] }) ################## At the moment tags looks like {'city_name': 'city_name'}
                 for tag in tags
             },
             'x': xdata[city],
@@ -98,8 +115,55 @@ def testdata():
     ]
 
     response = jsonify({
-        'data': data
+        'data': data,
+        # 'x_label' : ...,
     })
+
+    response.headers.add('Access-Control-Allow-Origin', '*')
+
+    return response
+
+@app.route('/mapdata')
+def mapdata():
+    xattr = request.args.get('xattr') or 'unemployment_pct_by_city'
+    tags = request.args.get('tag') or ['city_name']
+    tags = [tags] if isinstance(tags, str) else tags
+    
+    print(f'xattr: {xattr}')
+    print(f'tags: {tags}')
+
+    # http://haliax.local:5001/testdata?xattr=foo&yattr=bar&tag=a&tag=b&tag=c
+
+    xdata = db.fetch_view(xattr)
+
+    #data = [
+    #    {
+    #        'tags': {
+    #            tag : fetch_tag(tag, { xattr: xdata[city], yattr: ydata[city] }) ################## At the moment tags looks like {'city_name': 'city_name'}
+    #            for tag in tags
+    #        },
+    #        'x': xdata[city]
+    #    }
+    #    for city in set(xdata.keys()) & set(ydata.keys())
+    #]
+    data = {"type": "geojson",
+            "data": {
+                "type": "Feature",
+                "geometry": {
+                    "type": "MultiPoint",
+                    "coordinates": [[133.88, -23.69], 
+                                    [133.88, -33.69], 
+                                    [143.88, -23.69], 
+                                    [143.88, -33.69]]
+                },
+                "properties": {
+                    "title": "Mapbox DC",
+                    "marker-symbol": "monument"
+                }
+            }
+    }
+    
+    response = jsonify(data)
 
     response.headers.add('Access-Control-Allow-Origin', '*')
 

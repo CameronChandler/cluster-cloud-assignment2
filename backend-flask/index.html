@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+        <title>COMP90024 Application</title>
+
+        <!--Lato font-->
+        <link href='http://fonts.googleapis.com/css?family=Lato:400,700' rel='stylesheet' type='text/css'>
+
+        <style>
+        h1 {
+            font-family: "Lato", sans-serif; 
+            font-size: 50px;
+        }
+        p {
+            font-family: "Lato", sans-serif;
+            font-size: 15px;
+        }
+        img {
+            font-family: "Lato", sans-serif;
+            font-size: 15px;
+        }
+
+        .sidenav {
+            height: 100%;
+            width: 160px;
+            position: fixed;
+            z-index: 1;
+            top: 0;
+            left: 0;
+            background-color: #111;
+            overflow-x: hidden;
+            padding-top: 20px;
+        }
+
+        .sidenav a {
+            padding: 6px 8px 6px 16px;
+            text-decoration: none;
+            font-size: 25px;
+            color: #818181;
+            display: block;
+        }
+
+        .sidenav a:hover {
+            color: #f1f1f1;
+        }
+
+        .main {
+            margin-left: 160px; /* Same as the width of the sidenav */
+            font-size: 28px; /* Increased text to enable scrolling */
+            padding: 0px 10px;
+        }
+
+        @media screen and (max-height: 450px) {
+            .sidenav {padding-top: 15px;}
+            .sidenav a {font-size: 18px;}
+        }
+        </style>
+    </head>
+    <body><div class="main">
+        <h1>Literacy on Twitter</h1>
+
+        <div class="sidenav">
+            <a href="#home">Home</a>
+            <a href="#correlations">Correlations</a>
+        </div>
+    
+         <div>
+
+            <p>Select an x variable, a y variable and click "Plot"</p>
+          
+            <select id ="dropDownIdX">
+                <option value="x">-- x variable --</option>
+                <option value="x_unemployment">Unemployment</option>
+                <option value="x_income">Income</option>
+                <option value="x_word_length">Word Length</option>
+                <option value="x_education">Education</option>
+            </select>
+
+            <select id ="dropDownIdY">
+                <option value="y">-- y variable --</option>
+                <option value="y_unemployment">Unemployment</option>
+                <option value="y_income">Income</option>
+                <option value="y_word_length">Word Length</option>
+                <option value="y_education">Education</option>
+            </select>
+
+            <br>
+            <input class="SubmitButton" type="submit" name="SUBMITBUTTON"  value="Plot" style="font-size:20px; " />
+          </div>
+          <script src = "//code.jquery.com/jquery-3.0.0.min.js"></script> <!-- add jquery library-->
+          <script type = "text/javascript">
+          $('.SubmitButton').click(function(){ // on submit button click
+          
+            var x_choice = $('#dropDownIdX :selected').val(); // get the selected x option value
+            var y_choice = $('#dropDownIdY :selected').val(); // get the selected y option value
+            window.location.href = "http://"+x_choice+"__"+y_choice+".html" // Redirect
+          });
+          
+          </script>
+
+         <img src="img.png" alt="img" width="104" height="142">
+    </div></body>
+</html>
