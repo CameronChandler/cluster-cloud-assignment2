@@ -1,0 +1,11 @@
+- hosts: manager
+  tasks:
+    - name: Set up couchdb
+      tags:
+        - couchdb
+      script:
+        cmd: ../../docker/couch-no-stack/up.bash
+        executable: bash
+      register: results
+    - debug:
+        var: results.stdout

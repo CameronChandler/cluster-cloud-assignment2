@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+python-openstackclient = "*"
+toml = "*"
+python-heatclient = "*"
+openstacksdk = "*"
+jinja2 = "*"
+docker = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"

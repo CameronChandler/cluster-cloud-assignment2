@@ -1,0 +1,36 @@
+- name: Install aptitude
+  apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
+- name: Install required system packages
+  apt: name={{ item }} state=latest update_cache=yes
+  loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools' ]
+- name: Add Docker GPG key
+  environment:
+    http_proxy: 'http://wwwproxy.unimelb.edu.au:8000'
+    https_proxy: 'http://wwwproxy.unimelb.edu.au:8000'
+  apt_key:
+    url: https://download.docker.com/linux/debian/gpg
+    state: present
+- name: Add Docker Repository
+  apt_repository:
+    repo: deb https://download.docker.com/linux/debian buster stable
+    state: present
+- name: Install containerd.io container runtime
+  apt: update_cache=yes name=containerd.io state=latest
+- name: Update APT and install Docker CE
+  apt: update_cache=yes name=docker-ce state=latest
+
+- name: Install Docker Module for Python
+  pip:
+    name: docker
+
+# Adding the 'debian' user to the docker user group will let us invoke docker without using sudo
+# This in turn lets us use e.g. `docker context` to control the swarm from a remote machine
+- name: Create the docker user group
+  group:
+    name: docker
+    state: present
+
+- name: Add the 'debian' user to the docker user group
+  user:
+    name: debian
+    groups: 'docker'
