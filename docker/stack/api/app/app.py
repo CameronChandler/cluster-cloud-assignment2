@@ -10,6 +10,15 @@ import couchdb
 
 import json
 
+COORDINATES = {'canberra':  [149.13, -35.28],
+               'melbourne': [144.96, -37.81],
+               'sydney':    [151.21, -33.87],
+               'brisbane':  [153.03, -27.47],
+               'darwin':    [130.84, -12.46],
+               'perth':     [115.86, -31.95],
+               'adelaide':  [138.60, -34.93],
+               'hobart':    [147.33, -42.88]}
+
 # couch = couchdb.Server('http://localhost:5984')
 # db = couch.create('db_test')
 
@@ -54,6 +63,9 @@ class Database:
                 "sydney": 4.2,
                 "darwin": 1.8,
                 "perth": 5.3,
+                "canberra": 5.2,
+                "hobart": 3.7,
+                "brisbane": 3.9,
             },
 
             'unemployment_pct_by_city': {
@@ -62,6 +74,9 @@ class Database:
                 "sydney": 4.0,
                 "darwin": 3.0,
                 "perth": 5.0,
+                "canberra": 2.6,
+                "hobart": 6.9,
+                "brisbane": 7.8,
             },
 
             'median_income_by_city': {
@@ -70,6 +85,20 @@ class Database:
                 "sydney": 50.0,
                 "darwin": 25.0,
                 "perth": 28.0,
+                "canberra": 62.0,
+                "hobart": 48.5,
+                "brisbane": 33.0,
+            },
+
+            'non_school_qualifications_by_city': {
+                "melbourne": 34.0,
+                "adelaide": 32.0,
+                "sydney": 50.0,
+                "darwin": 25.0,
+                "perth": 28.0,
+                "canberra": 55.2,
+                "hobart": 33.7,
+                "brisbane": 23.9,
             }
         }
     
@@ -78,13 +107,30 @@ class Database:
 
 db = Database()
 
-def fetch_tag(tag, datasets):
+def fetch_tag(tag, datasets, city):
+    if tag == 'city_name':
+        return city.capitalize()
     return tag
 
-#@app.route('/graphkeys'):
-#   {'x_label': ...,
-#    'x_couchDB': ...,
-#    'x_dropdown': ...,}
+@app.route('/graphkeys')
+def graphkeys():
+    attr = request.args.get('attr') or 'unemployment_pct_by_city'
+    tags = request.args.get('tag') or ['city_name']
+    tags = [tags] if isinstance(tags, str) else tags
+    
+    print(f'xattr: {attr}')
+    print(f'tags: {tags}')
+
+    ATTRIBUTES = {'median_income_by_city': {'text': 'Income', 'label': 'Median Income ($`000s)'},
+                  'unemployment_pct_by_city': {'text': 'Unemployment', 'label': 'Unemployment (%)'},
+                  'non_school_qualifications_by_city': {'text': 'Higher Education', 'label': 'Population with Non-School Qualifications (%)'},
+                  'word_lengths_by_city': {'text': 'Average Word Length', 'label': 'Ave. Word Length (From Tweets)'}}
+
+    response = jsonify(ATTRIBUTES[attr])
+
+    response.headers.add('Access-Control-Allow-Origin', '*')
+
+    return response
 
 @app.route('/testdata')
 def testdata():
@@ -105,7 +151,7 @@ def testdata():
     data = [
         {
             'tags': {
-                tag : fetch_tag(tag, { xattr: xdata[city], yattr: ydata[city] }) ################## At the moment tags looks like {'city_name': 'city_name'}
+                tag : fetch_tag(tag, { xattr: xdata[city], yattr: ydata[city] }, city)
                 for tag in tags
             },
             'x': xdata[city],
@@ -123,47 +169,55 @@ def testdata():
 
     return response
 
+def label(attr, val):
+    if attr == 'median_income_by_city':
+        return f'Median Income: ${int(val*1000):,}'
+    if attr == 'unemployment_pct_by_city':
+        return f'Unemployment: {val}%'
+    if attr == 'non_school_qualifications_by_city':
+        return f'Persons with Non-School Qualifications: {val}%'
+    if attr == 'word_lengths_by_city':
+        return f'word_lengths_by_city: {val} characters'
+    return 'Missing Data'
+
 @app.route('/mapdata')
 def mapdata():
     xattr = request.args.get('xattr') or 'unemployment_pct_by_city'
-    tags = request.args.get('tag') or ['city_name']
-    tags = [tags] if isinstance(tags, str) else tags
+    #tags = request.args.get('tag') or ['city_name']
+    #tags = [tags] if isinstance(tags, str) else tags
     
     print(f'xattr: {xattr}')
-    print(f'tags: {tags}')
-
-    # http://haliax.local:5001/testdata?xattr=foo&yattr=bar&tag=a&tag=b&tag=c
+    #print(f'tags: {tags}')
 
     xdata = db.fetch_view(xattr)
 
-    #data = [
-    #    {
-    #        'tags': {
-    #            tag : fetch_tag(tag, { xattr: xdata[city], yattr: ydata[city] }) ################## At the moment tags looks like {'city_name': 'city_name'}
-    #            for tag in tags
-    #        },
-    #        'x': xdata[city]
-    #    }
-    #    for city in set(xdata.keys()) & set(ydata.keys())
-    #]
-    data = {"type": "geojson",
+    geodata = {"type": "geojson",
             "data": {
-                "type": "Feature",
-                "geometry": {
-                    "type": "MultiPoint",
-                    "coordinates": [[133.88, -23.69], 
-                                    [133.88, -33.69], 
-                                    [143.88, -23.69], 
-                                    [143.88, -33.69]]
-                },
-                "properties": {
-                    "title": "Mapbox DC",
-                    "marker-symbol": "monument"
-                }
+                "type": "FeatureCollection",
+                'features': [
+                    {
+                        'type': 'Feature',
+                        'properties': {
+                            'description': f'<strong>{city.capitalize()}</strong><p>{label(xattr, city_data)}</p>',
+                            'x': city_data
+                        },
+                        'geometry': {
+                            'type': 'Point',
+                            'coordinates': COORDINATES[city]
+                        }
+                    }
+                for city, city_data in xdata.items()]
             }
     }
+
+    data = {city.capitalize(): x for city, x in xdata.items()}
     
-    response = jsonify(data)
+    response = jsonify({
+        'geodata': geodata,
+        'data': data,
+        'cities': ['Canberra', 'Melbourne', 'Sydney', 'Brisbane', 
+                   'Darwin', 'Perth', 'Adelaide', 'Hobart']
+    })
 
     response.headers.add('Access-Control-Allow-Origin', '*')
 
