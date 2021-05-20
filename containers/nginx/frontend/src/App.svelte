@@ -19,7 +19,7 @@
   }
 
   async function renderD3(container, xattr, yattr) {
-    const response = await fetch('http://haliax.local:5001/testdata?xattr=' + xattr + '&yattr=' + yattr + '&tag=city_name');
+    const response = await fetch('/api/testdata?xattr=' + xattr + '&yattr=' + yattr + '&tag=city_name');
     const response_json = await response.json();
     const data = response_json['data'];
     // const data = [
@@ -106,7 +106,6 @@
         type: "vector",
         // https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#vector
         url: "mapbox://examples.8fgz4egr",
-        // url: "http://haliax.local:5001/mapdata?"
       });
       map.addLayer({
         id: "population",

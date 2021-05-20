@@ -1,4 +1,0 @@
-flask
-flask_restplus
-couchdb
-werkzeug==0.16.1

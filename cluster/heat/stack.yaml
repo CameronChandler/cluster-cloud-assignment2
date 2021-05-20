@@ -17,7 +17,7 @@ parameters:
   flavor:
     type: string
     description: Flavor
-    default: uom.mse.1c4g
+    default: uom.mse.2c9g
     constraints:
       - custom_constraint: nova.flavor
         description: Must be an existing flavor
@@ -113,6 +113,7 @@ resources:
       - { get_resource: ssh_secgroup }
       - { get_resource: docker_swarm_secgroup }
       - { get_resource: couchdb_secgroup }
+      - { get_resource: http_secgroup }
       networks:
         - allocate_network: auto
 
@@ -129,23 +130,26 @@ resources:
       - { get_resource: ssh_secgroup }
       - { get_resource: docker_swarm_secgroup }
       - { get_resource: couchdb_secgroup }
+      - { get_resource: http_secgroup }
       networks:
         - allocate_network: auto
-  # worker2:
-  #   # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Nova::Server
-  #   type: OS::Nova::Server
-  #   properties:
-  #     key_name: { get_param: key_name }
-  #     image: { get_param: image }
-  #     flavor: { get_param: flavor }
-  #     tags: ['docker-worker']
-  #     # availability_zone: { get_param: availability_zone }
-  #     security_groups:
-  #     - { get_resource: ssh_secgroup }
-  #     - { get_resource: docker_swarm_secgroup }
-  #     - { get_resource: couchdb_secgroup }
-  #     networks:
-  #       - allocate_network: auto
+
+  worker2:
+    # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Nova::Server
+    type: OS::Nova::Server
+    properties:
+      key_name: { get_param: key_name }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      tags: ['docker-worker']
+      # availability_zone: { get_param: availability_zone }
+      security_groups:
+      - { get_resource: ssh_secgroup }
+      - { get_resource: docker_swarm_secgroup }
+      - { get_resource: couchdb_secgroup }
+      - { get_resource: http_secgroup }
+      networks:
+        - allocate_network: auto
   
   # # Not sure how to map OpenStack volumes to Docker containers in a swarm yet
   # couch_vol1:
@@ -168,6 +172,8 @@ outputs:
   manager_ip:
     description: The IP address of manager node
     value: { get_attr: [manager, first_address] }
-  worker_ip:
-    description: The IP address of worker node
-    value: { get_attr: [worker, first_address] }
+  worker_ips:
+    description: The IP address of worker nodes
+    value: { list_join: [',', [
+      { get_attr: [worker, first_address] },
+      { get_attr: [worker2, first_address] }]] }

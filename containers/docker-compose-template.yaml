@@ -16,6 +16,12 @@ services:
       - 443:443
     networks:
       couch:
+  
+  api:
+    image: comp90024/api
+    build: ./api
+    networks:
+      couch:
 
   couch1:
     image: comp90024/couch_wrapper
