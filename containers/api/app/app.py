@@ -23,9 +23,14 @@ COUCHDB_USER=environ['COUCHDB_USER']
 COUCHDB_PASSWORD=environ['COUCHDB_PASSWORD']
 COUCHDB_HOST=environ['COUCHDB_HOST']
 
-remote_couch = couchdb.Server(f'https://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:6984/')
+couch_url = f'https://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:6984/'
+
+print(f'couch_url: {couch_url}')
+remote_couch = couchdb.Server(couch_url)
 remote_couch.resource.session.disable_ssl_verification()
-db = remote_couch['db_small_twitter']
+twitter_db = remote_couch['db_small_twitter']
+income_db = remote_couch['aurin_income']
+employment_db = remote_couch['aurin_employment']
 
 
 app = Flask(__name__)
@@ -47,35 +52,36 @@ class Language(Resource):
 
     @api.marshal_with(a_language, envelope='the_data')
     def get(self):
-        # all_languages = db.view('_all_docs', include_docs=True)
         print('got a get request')
         return 'ok'
 
     @api.expect(a_language)
     def post(self):
         new_language = api.payload 
-        # db.save(new_language)
-        #new_language['id'] = len(languages) + 1
-        #languages.append(new_language)
         return {'result' : 'Language added'}, 201 
 
 class Database:
 
     def __init__(self):
-        self.data = {'unemployment_pct_by_city': {
-                "melbourne": 1.0,
-                "adelaide": 2.0,
-                "sydney": 4.0,
-                "darwin": 3.0,
-                "perth": 5.0,
-            },
-        'word_lengths_by_city': self.get_word_lengths_by_city()
+        self.data = {
+            'income_by_city': self.get_income_by_city,
+            'word_lengths_by_city': self.get_word_lengths_by_city,
+            'non_school_by_city': self.get_non_school_by_city,
+            'unemployment_by_city': self.get_unemployment_by_city
         }
-    
+
+    def translate_city_name(self, name):
+        name_translations = {'Greater Melbourne': 'melbourne', 'Greater Sydney': 'sydney', 'Greater Adelaide': 'adelaide',\
+                            'Greater Brisbane': 'brisbane', 'Greater Hobart': 'hobart', 'Greater Darwin': 'darwin'}
+        if name in name_translations:
+            return name_translations[name]
+        else:
+            return name
+
     def get_word_lengths_by_city(self):
         cities = {}
         word_lengths_by_city = {}
-        for item in db.view('wordLengths/new-view', group=True):
+        for item in twitter_db.view('wordLengths/new-view', group=True):
             if item.key[0] in cities:
                 cities[item.key[0]]['total_word_length'] += item.value * item.key[1]
                 cities[item.key[0]]['tweet_count'] += item.value
@@ -87,8 +93,32 @@ class Database:
         
         return word_lengths_by_city
 
+    def get_income_by_city(self):
+        cities = {}
+        for item in income_db.view('median_income/income-view'):
+            city_name = self.translate_city_name(item.key)
+            if city_name not in cities:
+                cities[city_name] = item.value
+        return cities
+
+    def get_non_school_by_city(self):
+        cities = {}
+        for item in employment_db.view('education/non-school'):
+            city_name = self.translate_city_name(item.key)
+            if city_name not in cities:
+                cities[city_name] = item.value
+        return cities
+
+    def get_unemployment_by_city(self):
+        cities = {}
+        for item in employment_db.view('employment/unemployment-rate'):
+            city_name = self.translate_city_name(item.key)
+            if city_name not in cities:
+                cities[city_name] = item.value
+        return cities
+
     def fetch_view(self, view: str):
-        return self.data[view] if view in self.data else None
+        return self.data[view]() if view in self.data else None
 
 local_db = Database()
 
