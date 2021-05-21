@@ -3,11 +3,14 @@ version: "3.9"
 networks:
   couch:
     driver: overlay
+    # The `couch` network is explicitly marked attachable so we can run a
+    # bash script in a container attached to that network, and use that script to set up CouchDB clustering
+    # (without an attachable network, the script's container wouldn't be able to contact the Couch nodes)
     attachable: true
 
 services:
   nginx:
-    image: comp90024/nginx_wrapper
+    image: {{registry_address_port}}/nginx_wrapper
     build: ./nginx
     ports:
       - 5984:5984
@@ -18,7 +21,7 @@ services:
       couch:
   
   api:
-    image: comp90024/api
+    image: {{registry_address_port}}/api
     build: ./api
     environment:
       - COUCHDB_USER={{couchdb_username}}
@@ -27,8 +30,32 @@ services:
     networks:
       couch:
 
+  # CouchDB instance definitions
+  # These are mostly identical, however:
+  #   - Each node gets its own service (rather than having three replicas in one service) so that we can give each a unique hostname
+  #     This is necessary for clustering: we need to be able to contact each node individually rather than just using Docker's service load-balancing
+  #   - Each node joins the `couch` network so that the cluster-setup script can contact it
+  #   - Each Couch instance is constrained to a particular Docker host / OpenStack VM. This matters because each VM
+  #     has an OpenStack volume mounted at /mnt/couchstore, which we want only one Couch instance to be able to use.
+  couch0:
+    image: {{registry_address_port}}/couch_wrapper
+    build: ./couch
+    environment:
+      - COUCHDB_USER={{couchdb_username}}
+      - COUCHDB_PASSWORD={{couchdb_password}}
+      - COUCHDB_SECRET={{couchdb_secret}}
+      - ERL_FLAGS=-setcookie "{{couchdb_secret}}" -name couchdb@couch0. -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
+      - NODENAME=couch0.
+    networks:
+      couch:
+    deploy:
+      placement:
+        constraints: [node.labels.index==0]
+    volumes:
+      - /mnt/couchstore:/opt/couchdb/data
+
   couch1:
-    image: comp90024/couch_wrapper
+    image: {{registry_address_port}}/couch_wrapper
     build: ./couch
     environment:
       - COUCHDB_USER={{couchdb_username}}
@@ -38,9 +65,14 @@ services:
       - NODENAME=couch1.
     networks:
       couch:
+    deploy:
+      placement:
+        constraints: [node.labels.index==1]
+    volumes:
+      - /mnt/couchstore:/opt/couchdb/data
 
   couch2:
-    image: comp90024/couch_wrapper
+    image: {{registry_address_port}}/couch_wrapper
     build: ./couch
     environment:
       - COUCHDB_USER={{couchdb_username}}
@@ -50,21 +82,8 @@ services:
       - NODENAME=couch2.
     networks:
       couch:
-
-  couch3:
-    image: comp90024/couch_wrapper
-    build: ./couch
-    environment:
-      - COUCHDB_USER={{couchdb_username}}
-      - COUCHDB_PASSWORD={{couchdb_password}}
-      - COUCHDB_SECRET={{couchdb_secret}}
-      - ERL_FLAGS=-setcookie "{{couchdb_secret}}" -name couchdb@couch3. -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch3.
-    networks:
-      couch:
-
-# Theoretically, this should do the same thing as in the Dockerfile, but without the need to build a new image
-# Doesn't seem to work though...
-# configs:
-#   couch_config:
-#     file: ./couch_config.ini
+    deploy:
+      placement:
+        constraints: [node.labels.index==2]
+    volumes:
+      - /mnt/couchstore:/opt/couchdb/data
