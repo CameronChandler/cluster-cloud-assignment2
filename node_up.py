@@ -197,27 +197,31 @@ class Orchestrator:
     OpenStack Heat supports stack creation "outputs", which can be retrieved to get information about the stack.
     In our case, we use this to get the IP addresses of the VMs created.
     '''
-    if not self.__stack_outputs:
-      cmd = [
-        'openstack',
-        '--os-cloud', self.__os_config.cloud_name,
-        'stack', 'output', 'show',
-        '-f', 'json',
-        '--all',
-        name
-      ]
-      proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        env=environ.copy() | { 'OS_PASSWORD' : self.__os_config.cloud_password }
-      )
+    with chdir(ROOT):
+      if not self.__stack_outputs:
+        cmd = [
+          'pipenv',
+          'run',
+          'openstack',
+          '--os-cloud', self.__os_config.cloud_name,
+          'stack', 'output', 'show',
+          '-f', 'json',
+          '--all',
+          name
+        ]
+        proc = subprocess.Popen(
+          cmd,
+          stdout=subprocess.PIPE,
+          env=environ.copy() | { 'OS_PASSWORD' : self.__os_config.cloud_password }
+        )
 
-      stdout, _ = proc.communicate()
-      stdout = stdout.decode()
-      stdout = json.loads(stdout)
-      for k in stdout:
-        stdout[k] = json.loads(stdout[k])
-      self.__stack_outputs = stdout
+        stdout, _ = proc.communicate()
+        stdout = stdout.decode()
+        error(stdout)
+        stdout = json.loads(stdout)
+        for k in stdout:
+          stdout[k] = json.loads(stdout[k])
+        self.__stack_outputs = stdout
     
     return self.__stack_outputs
   
@@ -229,8 +233,6 @@ class Orchestrator:
     so we use the OpenStack stack creation outputs as described above.
     '''
     outputs = self.openstack_get_stack_creation_outputs(self.__os_config.stack_name)
-
-    outputs = self.__stack_outputs
 
     trace('Writing hosts file')
     with open(path.join(self.__paths['ansible'], 'generated_hosts.ini'), 'w') as hf:
@@ -251,6 +253,7 @@ class Orchestrator:
     and setting it up when it's not needed can prevent network operations from working properly.
     If you don't need the proxy, you can safely skip this step.
     '''
+
     proc = subprocess.Popen([
       'ansible-playbook',
       # Ansible doesn't handle trying to do auth for multiple servers concurrently very well
@@ -267,6 +270,20 @@ class Orchestrator:
     '''
     Run the ansible bootstrap script to install Docker on all the VMs.
     '''
+    manager = self.openstack_get_stack_creation_outputs(self.__os_config.stack_name)['manager_ip']['output_value']
+    template_in = 'docker_daemon_config.json.jinja2'
+    template_out = 'docker_daemon_config.json'
+    proxy_config_dir = path.join(ROOT, 'cluster', 'ansible', 'roles', 'common', 'files')
+    loader = jinja2.FileSystemLoader(searchpath=proxy_config_dir)
+    env = jinja2.Environment(loader=loader)
+    template = env.get_template(template_in)
+    rendered = template.render({
+      'registry_ip_port': ':'.join([manager, '4000'])
+    })
+    with open(path.join(proxy_config_dir, template_out), 'w') as f:
+      f.write(rendered)
+
+
     proc = subprocess.Popen([
       'ansible-playbook',
       # Ansible doesn't handle trying to do auth for multiple servers concurrently very well
@@ -301,6 +318,27 @@ class Orchestrator:
     ])
     subprocess.call(['docker', 'context', 'use', self.__docker_config.context_name])
 
+    self.docker_label_nodes()
+  
+  @traced('Label docker nodes', 'docker')
+  def docker_label_nodes(self):
+    '''
+    Assign labels to the docker nodes so that we can constrain services (e.g. CouchDB) to run on specific nodes
+    '''
+    nodes = [s.strip() for s in subprocess.check_output(['docker', 'node', 'ls', '-q']).decode().splitlines()]
+    for i, n in enumerate(nodes):
+      cmd = ['docker', 'node', 'update', '--label-add', f'index={i}', n]
+      trace('Calling for effect: ' + ' '.join(cmd))
+      subprocess.call(cmd)
+
+  @traced()
+  def start_docker_registry_service(self):
+    outputs = self.openstack_get_stack_creation_outputs(self.__os_config.stack_name)
+    hostname = outputs['manager_ip']['output_value']
+    cmd = ['docker', 'service', 'create', '--name', 'registry', '-p', '4000:5000', 'registry:2']
+    subprocess.call(cmd)
+    self.__docker_registry_address_port = ':'.join([hostname, '4000'])
+
   @traced('Generating docker-compose.yaml')
   def docker_gen_compose_definition(self):
     '''
@@ -316,18 +354,10 @@ class Orchestrator:
       'couchdb_username' : self.__couch_config.username,
       'couchdb_password' : self.__couch_config.password,
       'couchdb_secret' : self.__couch_config.secret,
+      'registry_address_port': self.__docker_registry_address_port,
     })
     with open('docker-compose.yaml', 'w') as f:
       f.write(compose)
-
-  @prompt('Remove existing containers')
-  @traced('Removing existing containers', 'docker')
-  def docker_remove_existing_containers(self):
-    subprocess.call(['docker', 'stack', 'rm', self.__docker_config.stack_name])
-    containers = filter(None, subprocess.check_output(['docker', 'ps', '-a', '-q']).decode().splitlines())
-    for container in containers:
-      subprocess.call(['docker', 'stop', container])
-      subprocess.call(['docker', 'rm', container])
 
   @prompt('Deploy docker stack')
   @traced('Deploying docker stack', 'docker')
@@ -339,11 +369,14 @@ class Orchestrator:
     docker context, then uses `docker stack` to deploy services and other resources onto that swarm.
     '''
     with chdir(self.__paths['stack']):
-      self.docker_remove_existing_containers()
+      subprocess.call(['docker', 'stack', 'rm', self.__docker_config.stack_name])
+
+      self.start_docker_registry_service()
 
       self.docker_gen_compose_definition()
 
       subprocess.call(['docker-compose', 'build'])
+      subprocess.call(['docker-compose', 'push'])
       subprocess.call([
         'docker',
         'stack',

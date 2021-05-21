@@ -36,14 +36,14 @@
   let answer = '';
 
   async function renderD3(container, xattr, yattr) {
-    let response = await fetch('/testdata?xattr=' + xattr + '&yattr=' + yattr);
+    let response = await fetch('/api/testdata?xattr=' + xattr + '&yattr=' + yattr);
     let response_json = await response.json();
     let data = response_json['data'];
     
-    let response_x = await fetch('/graphkeys?attr=' + xattr);
+    let response_x = await fetch('/api/graphkeys?attr=' + xattr);
     let graphkeys_x = await response_x.json();
     
-    let response_y = await fetch('/graphkeys?attr=' + yattr);
+    let response_y = await fetch('/api/graphkeys?attr=' + yattr);
     let graphkeys_y = await response_y.json();
 
     // set the dimensions and margins of the graph
@@ -134,7 +134,7 @@
   mapboxgl.accessToken = "pk.eyJ1IjoiYWxhcm9sZGFpIiwiYSI6ImNrb21sMnRwNzBpMzAyb28xaTFjdHMxcHgifQ.DEHbZyOipWRM1qAp3TTQew";
   
   async function renderMapbox(container, attr) {
-    let response = await fetch('/mapdata?xattr=' + attr);
+    let response = await fetch('/api/mapdata?xattr=' + attr);
     let response_json = await response.json();
 
     let data = response_json['data'];

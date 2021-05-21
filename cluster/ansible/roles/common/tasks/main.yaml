@@ -34,3 +34,27 @@
   user:
     name: debian
     groups: 'docker'
+
+- name: Format and mount Cinder block storage
+  filesystem:
+    fstype: ext4
+    # Does Cinder always attach volumes as /dev/vdb? Seems reliable for now...
+    dev: /dev/vdb
+- ansible.posix.mount:
+    path: /mnt/couchstore
+    src: /dev/vdb
+    fstype: ext4
+    state: mounted
+- file:
+    path: /mnt/couchstore
+    group: docker
+    owner: debian
+    mode: u=rwx,g=rwx,o=rwx
+
+- copy:
+    src: docker_daemon_config.json
+    dest: /etc/docker/daemon.json
+# Docker needs to be restarted to pick up the daemon config
+- systemd:
+    name: docker
+    state: restarted

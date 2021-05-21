@@ -23,9 +23,19 @@ COUCHDB_USER=environ['COUCHDB_USER']
 COUCHDB_PASSWORD=environ['COUCHDB_PASSWORD']
 COUCHDB_HOST=environ['COUCHDB_HOST']
 
-remote_couch = couchdb.Server(f'https://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:6984/')
+couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:5984/'
+
+print(f'couch_url: {couch_url}')
+remote_couch = couchdb.Server(couch_url)
 remote_couch.resource.session.disable_ssl_verification()
-db = remote_couch['db_small_twitter']
+
+def twitter_db():
+    return remote_couch['db_small_twitter']
+def income_db():
+    return remote_couch['aurin_income']
+def employment_db():
+    return remote_couch['aurin_employment']
+
 
 
 app = Flask(__name__)
@@ -47,35 +57,50 @@ class Language(Resource):
 
     @api.marshal_with(a_language, envelope='the_data')
     def get(self):
-        # all_languages = db.view('_all_docs', include_docs=True)
         print('got a get request')
         return 'ok'
 
     @api.expect(a_language)
     def post(self):
         new_language = api.payload 
-        # db.save(new_language)
-        #new_language['id'] = len(languages) + 1
-        #languages.append(new_language)
         return {'result' : 'Language added'}, 201 
 
 class Database:
 
     def __init__(self):
-        self.data = {'unemployment_pct_by_city': {
-                "melbourne": 1.0,
-                "adelaide": 2.0,
-                "sydney": 4.0,
-                "darwin": 3.0,
-                "perth": 5.0,
-            },
-        'word_lengths_by_city': self.get_word_lengths_by_city()
+        self.data = {
+            'median_income_by_city': self.get_median_income_by_city,
+            'word_lengths_by_city': self.get_word_lengths_by_city,
+            'non_school_qualifications_by_city': self.get_non_school_qualifications_by_city,
+            'unemployment_pct_by_city': self.get_unemployment_pct_by_city,
         }
-    
+
+    def translate_city_name_from_couch_to_ui(self, name):
+        name = name.lower().removeprefix('greater').strip()
+        known_cities = {
+            'melbourne',
+            'sydney',
+            'adelaide',
+            'brisbane',
+            'hobart',
+            'darwin',
+            'australian capital territory',
+            'perth',
+        }
+        if name not in known_cities:
+            return None
+
+        rename_cities = {
+            'australian capital territory' : 'canberra'
+        }
+        name = rename_cities[name] if name in rename_cities else name
+
+        return name
+
     def get_word_lengths_by_city(self):
         cities = {}
         word_lengths_by_city = {}
-        for item in db.view('wordLengths/new-view', group=True):
+        for item in twitter_db().view('wordLengths/new-view', group=True):
             if item.key[0] in cities:
                 cities[item.key[0]]['total_word_length'] += item.value * item.key[1]
                 cities[item.key[0]]['tweet_count'] += item.value
@@ -87,8 +112,38 @@ class Database:
         
         return word_lengths_by_city
 
+    def get_median_income_by_city(self):
+        cities = {}
+        for item in income_db().view('median_income/income-view'):
+            city_name = self.translate_city_name_from_couch_to_ui(item.key)
+            if city_name not in cities:
+                cities[city_name] = item.value
+        return cities
+
+    def get_non_school_qualifications_by_city(self):
+        cities = {}
+        for item in employment_db().view('education/non-school'):
+            city_name = self.translate_city_name_from_couch_to_ui(item.key)
+            if city_name not in cities:
+                cities[city_name] = item.value
+        return cities
+
+    def get_unemployment_pct_by_city(self):
+        cities = {}
+        for item in employment_db().view('employment/unemployment-rate'):
+            city_name = self.translate_city_name_from_couch_to_ui(item.key)
+            if city_name not in cities:
+                cities[city_name] = item.value
+        return cities
+
     def fetch_view(self, view: str):
-        return self.data[view] if view in self.data else None
+        if view not in self.data:
+            return None
+
+        result = self.data[view]()
+        if None in result:
+            del result[None]
+        return result
 
 local_db = Database()
 
@@ -101,7 +156,7 @@ def graphkeys():
     print(f'xattr: {attr}')
     print(f'tags: {tags}')
 
-    ATTRIBUTES = {'median_income_by_city': {'text': 'Income', 'label': 'Median Income ($`000s)'},
+    ATTRIBUTES = {'median_income_by_city': {'text': 'Income', 'label': 'Median Income ($)'},
                   'unemployment_pct_by_city': {'text': 'Unemployment', 'label': 'Unemployment (%)'},
                   'non_school_qualifications_by_city': {'text': 'Higher Education', 'label': 'Population with Non-School Qualifications (%)'},
                   'word_lengths_by_city': {'text': 'Average Word Length', 'label': 'Ave. Word Length (From Tweets)'}}
@@ -147,7 +202,7 @@ def testdata():
 
 def label(attr, val):
     if attr == 'median_income_by_city':
-        return f'Median Income: ${int(val*1000):,}'
+        return f'Median Income: ${int(val):,}'
     if attr == 'unemployment_pct_by_city':
         return f'Unemployment: {val}%'
     if attr == 'non_school_qualifications_by_city':
@@ -162,7 +217,7 @@ def mapdata():
     
     print(f'xattr: {xattr}')
 
-    xdata = db.fetch_view(xattr)
+    xdata = local_db.fetch_view(xattr)
 
     geodata = {"type": "geojson",
             "data": {

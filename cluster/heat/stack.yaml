@@ -27,16 +27,7 @@ parameters:
     description: Image ID or name
     default: NeCTAR Debian 10 (Buster) amd64
 
-resources:
-  melbourne_uni_proxy_secgroup:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      rules:
-        - remote_ip_prefix: 0.0.0.0/0
-          protocol: tcp
-          port_range_min: 8000
-          port_range_max: 8000
-  
+resources: 
   http_secgroup:
     type: OS::Neutron::SecurityGroup
     properties:
@@ -87,6 +78,15 @@ resources:
           port_range_min: 5000
           port_range_max: 5000
 
+  docker_registry_secgroup:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 4000
+          port_range_max: 4000
+
   couchdb_secgroup:
     type: OS::Neutron::SecurityGroup
     properties:
@@ -114,6 +114,7 @@ resources:
       - { get_resource: docker_swarm_secgroup }
       - { get_resource: couchdb_secgroup }
       - { get_resource: http_secgroup }
+      - { get_resource: docker_registry_secgroup }
       networks:
         - allocate_network: auto
 
@@ -131,6 +132,7 @@ resources:
       - { get_resource: docker_swarm_secgroup }
       - { get_resource: couchdb_secgroup }
       - { get_resource: http_secgroup }
+      - { get_resource: docker_registry_secgroup }
       networks:
         - allocate_network: auto
 
@@ -148,25 +150,42 @@ resources:
       - { get_resource: docker_swarm_secgroup }
       - { get_resource: couchdb_secgroup }
       - { get_resource: http_secgroup }
+      - { get_resource: docker_registry_secgroup }
       networks:
         - allocate_network: auto
   
-  # # Not sure how to map OpenStack volumes to Docker containers in a swarm yet
-  # couch_vol1:
-  #   type: OS::Cinder::Volume
-  #   properties:
-  #     size: 20
-  #     availability_zone: melbourne-qh2-uom
-  # couch_vol2:
-  #   type: OS::Cinder::Volume
-  #   properties:
-  #     size: 20
-  #     availability_zone: melbourne-qh2-uom
-  # couch_vol3:
-  #   type: OS::Cinder::Volume
-  #   properties:
-  #     size: 20
-  #     availability_zone: melbourne-qh2-uom
+  # Not sure how to map OpenStack volumes to Docker containers in a swarm yet
+  manager_vol:
+    type: OS::Cinder::Volume
+    properties:
+      size: 20
+      availability_zone: melbourne-qh2-uom
+  worker_vol:
+    type: OS::Cinder::Volume
+    properties:
+      size: 20
+      availability_zone: melbourne-qh2-uom
+  worker2_vol:
+    type: OS::Cinder::Volume
+    properties:
+      size: 20
+      availability_zone: melbourne-qh2-uom
+  
+  manager_vol_attachment:
+    type: OS::Cinder::VolumeAttachment
+    properties:
+      instance_uuid: { get_resource: manager }
+      volume_id: { get_resource: manager_vol }
+  worker_vol_attachment:
+    type: OS::Cinder::VolumeAttachment
+    properties:
+      instance_uuid: { get_resource: worker }
+      volume_id: { get_resource: worker_vol }
+  worker2_vol_attachment:
+    type: OS::Cinder::VolumeAttachment
+    properties:
+      instance_uuid: { get_resource: worker2 }
+      volume_id: { get_resource: worker2_vol }
 
 outputs:
   manager_ip:
@@ -176,4 +195,14 @@ outputs:
     description: The IP address of worker nodes
     value: { list_join: [',', [
       { get_attr: [worker, first_address] },
-      { get_attr: [worker2, first_address] }]] }
+      { get_attr: [worker2, first_address] }
+    ]] }
+  manager_volid:
+    description: The uuid of the manager's volume
+    value: { get_resource: manager_vol }
+  worker_vols:
+    description: The uuid of the workers volumes
+    value: { list_join: [',', [
+      { get_resource: worker_vol },
+      { get_resource: worker2_vol }
+    ]]}

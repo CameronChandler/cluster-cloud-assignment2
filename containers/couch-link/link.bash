@@ -3,7 +3,7 @@
 set -euxo pipefail
 
 # These are the IP addresses assigned to couchdb in the docker-compose.yaml file
-declare -ax nodes=(couch1. couch2. couch3.)
+declare -ax nodes=(couch0. couch1. couch2.)
 export masternode=`echo ${nodes} | cut -f1 -d' '`
 declare -ax othernodes=`echo ${nodes[@]} | sed s/${masternode}//`
 export size=${#nodes[@]}
