@@ -17,8 +17,13 @@ COORDINATES = {'canberra':  [149.13, -35.28],
                'adelaide':  [138.60, -34.93],
                'hobart':    [147.33, -42.88]}
 
+from os import environ
 
-remote_couch = couchdb.Server('https://admin:answering_railcar@118.138.238.242:6984/')
+COUCHDB_USER=environ['COUCHDB_USER']
+COUCHDB_PASSWORD=environ['COUCHDB_PASSWORD']
+COUCHDB_HOST=environ['COUCHDB_HOST']
+
+remote_couch = couchdb.Server(f'https://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:6984/')
 remote_couch.resource.session.disable_ssl_verification()
 db = remote_couch['db_small_twitter']
 

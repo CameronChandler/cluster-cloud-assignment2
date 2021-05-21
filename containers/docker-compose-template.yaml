@@ -20,6 +20,10 @@ services:
   api:
     image: comp90024/api
     build: ./api
+    environment:
+      - COUCHDB_USER={{couchdb_username}}
+      - COUCHDB_PASSWORD={{couchdb_password}}
+      - COUCHDB_HOST=nginx.
     networks:
       couch:
 
