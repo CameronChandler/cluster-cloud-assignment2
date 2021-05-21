@@ -10,7 +10,7 @@ networks:
 
 services:
   nginx:
-    image: {{registry_address_port}}/nginx_wrapper
+    image: {{registry_address_port}}/nginx_wrapper:latest
     build: ./nginx
     ports:
       - 5984:5984
@@ -21,7 +21,7 @@ services:
       couch:
   
   api:
-    image: {{registry_address_port}}/api
+    image: {{registry_address_port}}/api:latest
     build: ./api
     environment:
       - COUCHDB_USER={{couchdb_username}}
@@ -38,7 +38,7 @@ services:
   #   - Each Couch instance is constrained to a particular Docker host / OpenStack VM. This matters because each VM
   #     has an OpenStack volume mounted at /mnt/couchstore, which we want only one Couch instance to be able to use.
   couch0:
-    image: {{registry_address_port}}/couch_wrapper
+    image: {{registry_address_port}}/couch_wrapper:latest
     build: ./couch
     environment:
       - COUCHDB_USER={{couchdb_username}}
@@ -55,7 +55,7 @@ services:
       - /mnt/couchstore:/opt/couchdb/data
 
   couch1:
-    image: {{registry_address_port}}/couch_wrapper
+    image: {{registry_address_port}}/couch_wrapper:latest
     build: ./couch
     environment:
       - COUCHDB_USER={{couchdb_username}}
@@ -72,7 +72,7 @@ services:
       - /mnt/couchstore:/opt/couchdb/data
 
   couch2:
-    image: {{registry_address_port}}/couch_wrapper
+    image: {{registry_address_port}}/couch_wrapper:latest
     build: ./couch
     environment:
       - COUCHDB_USER={{couchdb_username}}
