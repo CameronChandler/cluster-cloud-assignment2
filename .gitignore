@@ -1,2 +1,2 @@
 __pycache__
-docker/stack/docker-compose.yaml
+containers/docker-compose.yaml
