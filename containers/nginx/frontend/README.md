@@ -103,3 +103,15 @@ Then, from within your project folder:
 npm run build
 surge public my-project.surge.sh
 ```
+
+## Interaction with the REST API
+
+App.svelte has functions `renderD3` and `renderMapbox` for generating the visualisations.
+
+Both functions use the asynchronous `fetch` function to retrieve data from the REST API.
+
+`renderD3` is called with an x and a y attribute, and then fetches data at the URL `'/api/testdata?xattr=' + xattr + '&yattr=' + yattr`. 
+
+Then the function will retrieve the relevant x and y labels and title with further `fetch` calls to `fetch('/api/graphkeys?attr=' + xattr)` and `fetch('/api/graphkeys?attr=' + yattr)` respectively.
+
+The `renderMapbox` function need only call ` fetch('/api/mapdata?xattr=' + attr)` to get the required data.
