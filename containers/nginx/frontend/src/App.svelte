@@ -137,7 +137,6 @@
     let response = await fetch('/api/mapdata?xattr=' + attr);
     let response_json = await response.json();
 
-    let data = response_json['data'];
     let geodata = response_json['geodata'];
 
     var map = new mapboxgl.Map({
@@ -148,6 +147,8 @@
             center: [133.88, -23.69],
     });
 
+  let data = geodata['data']['features'].map(e => e['properties']['x']);
+    
   let min_x = Math.min(...Object.values(data));
   let max_x = Math.max(...Object.values(data));
 
