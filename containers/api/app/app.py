@@ -1,12 +1,8 @@
 import werkzeug
 werkzeug.cached_property = werkzeug.utils.cached_property
 from flask import Flask, Blueprint, jsonify, request
-from flask_restplus import Api, Resource, fields
 from werkzeug.utils import cached_property
 import couchdb
-
-import json
-
 
 COORDINATES = {'canberra':  [149.13, -35.28],
                'melbourne': [144.96, -37.81],
@@ -36,34 +32,7 @@ def income_db():
 def employment_db():
     return remote_couch['aurin_employment']
 
-
-
 app = Flask(__name__)
-blueprint = Blueprint('api', __name__, url_prefix='/api')
-api = Api(blueprint, doc='/documentation') #,doc=False
-
-app.register_blueprint(blueprint)
-
-app.config['SWAGGER_UI_JSONEDITOR'] = True
-
-a_language = api.model('Language', {'language' : fields.String('The language.')}) #, 'id' : fields.Integer('ID')
- 
-languages = []
-python = {'language' : 'Python', 'id' : 1}
-languages.append(python)
-
-@api.route('/language')
-class Language(Resource):
-
-    @api.marshal_with(a_language, envelope='the_data')
-    def get(self):
-        print('got a get request')
-        return 'ok'
-
-    @api.expect(a_language)
-    def post(self):
-        new_language = api.payload 
-        return {'result' : 'Language added'}, 201 
 
 class Database:
 
@@ -250,8 +219,6 @@ def mapdata():
     response.headers.add('Access-Control-Allow-Origin', '*')
 
     return response
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)
