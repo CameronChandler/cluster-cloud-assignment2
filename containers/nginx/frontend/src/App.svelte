@@ -36,7 +36,7 @@
   let answer = '';
 
   async function renderD3(container, xattr, yattr) {
-    let response = await fetch('/api/testdata?xattr=' + xattr + '&yattr=' + yattr);
+    let response = await fetch('/api/chartdata?xattr=' + xattr + '&yattr=' + yattr);
     let response_json = await response.json();
     let data = response_json['data'];
     
