@@ -62,8 +62,8 @@ if __name__ == '__main__':
     streamer = TwitterStreamer()
 
     try:
-        remote_tweet_db = remote_couch['tweets_db'] # get tweets database
-        db_doc_count = remote_tweet_db.info()['doc_count'] # get total document count of remote database
+        remote_tweet_db = remote_couch['tweets_db']  # get tweets database
+        db_doc_count = remote_tweet_db.info()['doc_count']  # get total document count of remote database
 
     except BaseException as e:
         print("Error on connecting to database: ", str(e))
@@ -71,6 +71,6 @@ if __name__ == '__main__':
 
     while streamer.harvest_count + db_doc_count < 50000:
         try:
-            streamer.stream_tweets() # keep streaming tweets if database document count is lower than 50,000
+            streamer.stream_tweets()  # keep streaming tweets if database document count is lower than 50,000
         except Exception as e:
             print(e)
