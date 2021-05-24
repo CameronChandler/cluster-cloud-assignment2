@@ -2,7 +2,7 @@ import couchdb
 import json
 
 # set up connection to remote couchdb
-remote_couch = couchdb.Server('https://admin:answering_railcar@118.138.238.242:6984/')
+remote_couch = couchdb.Server('https://admin:answering_railcar@172.26.133.242:6984/')
 remote_couch.resource.session.disable_ssl_verification()
 
 # ingest employment data
