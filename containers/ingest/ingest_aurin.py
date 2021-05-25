@@ -7,11 +7,12 @@ COUCHDB_USER=environ['COUCHDB_USER']
 COUCHDB_PASSWORD=environ['COUCHDB_PASSWORD']
 COUCHDB_HOST=environ['COUCHDB_HOST']
 
-couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:6984/'
+couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:5984/'
 
 # set up connection to remote couchdb
 remote_couch = couchdb.Server(couch_url)
-remote_couch.resource.session.disable_ssl_verification()
+# remote_couch.resource.session.disable_ssl_verification()
+# when using port 6984 when ssl is involved
 
 # ingest employment data
 try:
