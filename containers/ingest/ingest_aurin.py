@@ -1,8 +1,16 @@
 import couchdb
 import json
 
+from os import environ
+
+COUCHDB_USER=environ['COUCHDB_USER']
+COUCHDB_PASSWORD=environ['COUCHDB_PASSWORD']
+COUCHDB_HOST=environ['COUCHDB_HOST']
+
+couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:6984/'
+
 # set up connection to remote couchdb
-remote_couch = couchdb.Server('https://admin:answering_railcar@172.26.133.242:6984/')
+remote_couch = couchdb.Server(couch_url)
 remote_couch.resource.session.disable_ssl_verification()
 
 # ingest employment data
