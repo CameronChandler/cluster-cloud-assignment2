@@ -1,7 +1,13 @@
 import tweepy
 import couchdb
 import json
-import credentials
+
+from os import environ
+
+TWEEPY_CONSUMER_KEY = environ['TWEEPY_CONSUMER_KEY']
+TWEEPY_CONSUMER_SECRET = environ['TWEEPY_CONSUMER_SECRET']
+TWEEPY_ACCESS_TOKEN = environ['TWEEPY_ACCESS_TOKEN']
+TWEEPY_TOKEN_SECRET = environ['TWEEPY_TOKEN_SECRET']
 
 
 class TwitterAuth:
@@ -9,8 +15,8 @@ class TwitterAuth:
 
     def get_twitter_auth(self):
         # function create and return an authentication object
-        auth = tweepy.OAuthHandler(credentials.consumer_key, credentials.consumer_secret)
-        auth.set_access_token(credentials.access_token, credentials.access_token_secret)
+        auth = tweepy.OAuthHandler(TWEEPY_CONSUMER_KEY, TWEEPY_CONSUMER_SECRET)
+        auth.set_access_token(TWEEPY_ACCESS_TOKEN, TWEEPY_TOKEN_SECRET)
         return auth
 
 
@@ -56,8 +62,16 @@ class TwitterListener(tweepy.StreamListener):
 
 if __name__ == '__main__':
     # main function
-    remote_couch = couchdb.Server('https://admin:answering_railcar@172.26.133.242:6984/')
-    remote_couch.resource.session.disable_ssl_verification()
+
+    COUCHDB_USER = environ['COUCHDB_USER']
+    COUCHDB_PASSWORD = environ['COUCHDB_PASSWORD']
+    COUCHDB_HOST = environ['COUCHDB_HOST']
+
+    couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:5984/'
+
+    remote_couch = couchdb.Server(couch_url)
+    # remote_couch.resource.session.disable_ssl_verification()
+    # when using port 6984 when ssl is involved
 
     streamer = TwitterStreamer()
 
