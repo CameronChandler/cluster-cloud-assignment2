@@ -26,7 +26,7 @@ remote_couch = couchdb.Server(couch_url)
 remote_couch.resource.session.disable_ssl_verification()
 
 def twitter_db():
-    return remote_couch['db_small_twitter']
+    return remote_couch['tweets_db']
 def income_db():
     return remote_couch['aurin_income']
 def employment_db():
@@ -69,7 +69,7 @@ class Database:
     def get_word_lengths_by_city(self):
         cities = {}
         word_lengths_by_city = {}
-        for item in twitter_db().view('wordLengths/new-view', group=True):
+        for item in twitter_db().view('word-lengths/new-view', group=True):
             if item.key[0] in cities:
                 cities[item.key[0]]['total_word_length'] += item.value * item.key[1]
                 cities[item.key[0]]['tweet_count'] += item.value
