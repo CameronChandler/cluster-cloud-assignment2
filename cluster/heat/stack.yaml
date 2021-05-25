@@ -4,7 +4,7 @@
 heat_template_version: 2018-08-31
 description: >
   A simple deployment of three VMs on Nectar
-  Stores the ip addresses of the servers in 
+  Stores the ip addresses of the servers in the stack creation outputs
 
 parameters:
   key_name:
@@ -91,7 +91,7 @@ resources:
     type: OS::Neutron::SecurityGroup
     properties:
       rules:
-        - remote_ip_prefix: 0.0.0.0/0
+        - remote_group_id: { get_resource: ssh_secgroup }
           protocol: tcp
           port_range_min: 5984
           port_range_max: 5984

@@ -1,9 +1,13 @@
 # This should be run via ssh onto one of the compute instances
+# INPUTS:
+#   - COUCH_NODE_ID_MAX (integer)
+#   - COUCH_USER        (string)
+#   - COUCH_PASSWORD    (string)
 
 set -euxo pipefail
 
 # These are the IP addresses assigned to couchdb in the docker-compose.yaml file
-declare -ax nodes=(couch0. couch1. couch2.)
+declare -ax nodes=(`seq 0 ${COUCH_NODE_ID_MAX} | awk '{ print "couch" $0 "." }'`)
 export masternode=`echo ${nodes} | cut -f1 -d' '`
 declare -ax othernodes=`echo ${nodes[@]} | sed s/${masternode}//`
 export size=${#nodes[@]}
