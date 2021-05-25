@@ -12,6 +12,8 @@ import hashlib
 import uuid
 import jinja2
 
+from couchdb_setup import generate_design_docs
+
 from log import *
 
 SCRIPT=path.realpath(__file__)
@@ -463,21 +465,16 @@ class Orchestrator:
         'comp90024/couch_link'
       ])
 
-  # @prompt('Deploy CouchDB Views')
-  # @traced('Deploying CouchDB Views')
-  # def deploy_views(self):
-  #   '''
-  #   Finish configuring the CouchDB cluster by installing design docs
-  #   '''
-  #   for view in os.listdir('couchdb/views'):
-  #     with open(view, 'r') as f:
-  #       viewstring = f.read()
-  #       subprocess.call([
-  #         'curl',
-  #         '-X', 'PUT',
-  #         f'http://admin:password@{}:5984/db/_design/my_ddoc',
-  #         '-d ', viewstring
-  #       ])
+  @prompt('Perform DB first time setup')
+  @traced()
+  def try_first_time_db_setup(self):
+    with chdir('couchdb_setup'):
+      generate_design_docs(
+        host=self.manager,
+        port=6984,
+        user=self.__couch_config.username,
+        password=self.__couch_config.password
+      )
 
   @prompt('Build frontend')
   @traced('build frontend', 'npm')
@@ -506,7 +503,7 @@ def main():
   client.build_docker_stack()
   client.docker_deploy_stack()
   client.link_couch()
-  # client.deploy_views()
+  client.try_first_time_db_setup()
 
 if __name__ == '__main__':
   main()
