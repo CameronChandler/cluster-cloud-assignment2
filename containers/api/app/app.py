@@ -142,14 +142,12 @@ def graphkeys():
     return response
 
 @app.route('/chartdata')
-def testdata():
+def chartdata():
     xattr = request.args.get('xattr') or 'unemployment_pct_by_city'
     yattr = request.args.get('yattr') or 'word_lengths_by_city'
     
     print(f'xattr: {xattr}')
     print(f'yattr: {yattr}')
-
-    # http://haliax.local:5001/testdata?xattr=foo&yattr=bar&tag=a&tag=b&tag=c
 
     xdata = local_db.fetch_view(xattr)
     print("XDATA")
