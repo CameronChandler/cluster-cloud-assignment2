@@ -8,6 +8,8 @@ COUCHDB_PASSWORD=environ['COUCHDB_PASSWORD']
 COUCHDB_HOST=environ['COUCHDB_HOST']
 
 couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:5984/'
+# use 5984 in container cluster
+# use 6984 on local machine
 
 # set up connection to remote couchdb
 remote_couch = couchdb.Server(couch_url)
