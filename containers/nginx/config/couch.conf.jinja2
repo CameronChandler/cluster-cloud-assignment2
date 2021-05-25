@@ -1,17 +1,13 @@
 client_max_body_size 0;
 
 upstream fauxton {
-  server couch0.:5984;
+  server {{couchdb_nodes[0]}}.:5984;
 }
 
 upstream couch {
-  
-  server couch0:5984;
-  
-  server couch1:5984;
-  
-  server couch2:5984;
-  
+  {% for node in couchdb_nodes %}
+  server {{node}}:5984;
+  {% endfor %}
 }
 
 server {

@@ -36,53 +36,21 @@ services:
   #   - Each node joins the `couch` network so that the cluster-setup script can contact it
   #   - Each Couch instance is constrained to a particular Docker host / OpenStack VM. This matters because each VM
   #     has an OpenStack volume mounted at /mnt/couchstore, which we want only one Couch instance to be able to use.
-  couch0:
+  {% for node in docker_nodes %}
+  couch{{loop.index0}}:
     image: {{registry_address_port}}/couch_wrapper:latest
     build: ./couch
     environment:
       - COUCHDB_USER={{couchdb_username}}
       - COUCHDB_PASSWORD={{couchdb_password}}
       - COUCHDB_SECRET={{couchdb_secret}}
-      - ERL_FLAGS=-setcookie "{{couchdb_secret}}" -name couchdb@couch0. -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch0.
+      - ERL_FLAGS=-setcookie "{{couchdb_secret}}" -name couchdb@couch{{loop.index0}}. -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
+      - NODENAME=couch{{loop.index0}}.
     networks:
       couch:
     deploy:
       placement:
-        constraints: [node.labels.index==0]
+        constraints: [node.labels.index=={{loop.index0}}]
     volumes:
       - /mnt/couchstore:/opt/couchdb/data
-
-  couch1:
-    image: {{registry_address_port}}/couch_wrapper:latest
-    build: ./couch
-    environment:
-      - COUCHDB_USER={{couchdb_username}}
-      - COUCHDB_PASSWORD={{couchdb_password}}
-      - COUCHDB_SECRET={{couchdb_secret}}
-      - ERL_FLAGS=-setcookie "{{couchdb_secret}}" -name couchdb@couch1. -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch1.
-    networks:
-      couch:
-    deploy:
-      placement:
-        constraints: [node.labels.index==1]
-    volumes:
-      - /mnt/couchstore:/opt/couchdb/data
-
-  couch2:
-    image: {{registry_address_port}}/couch_wrapper:latest
-    build: ./couch
-    environment:
-      - COUCHDB_USER={{couchdb_username}}
-      - COUCHDB_PASSWORD={{couchdb_password}}
-      - COUCHDB_SECRET={{couchdb_secret}}
-      - ERL_FLAGS=-setcookie "{{couchdb_secret}}" -name couchdb@couch2. -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch2.
-    networks:
-      couch:
-    deploy:
-      placement:
-        constraints: [node.labels.index==2]
-    volumes:
-      - /mnt/couchstore:/opt/couchdb/data
+  {% endfor %}
