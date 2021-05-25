@@ -77,8 +77,9 @@ class Database:
                 cities[item.key[0]] = {'total_word_length': item.value * item.key[1], 'tweet_count': item.value}
 
         for city_name in cities.keys():
-            word_lengths_by_city[city_name] = cities[city_name]['total_word_length'] / cities[city_name]['tweet_count']
-        
+            word_lengths_by_city[self.translate_city_name_from_couch_to_ui(city_name)] = cities[city_name]['total_word_length'] / cities[city_name]['tweet_count']
+        print("word_lengths_by_city")
+        print(word_lengths_by_city)
         return word_lengths_by_city
 
     def get_median_income_by_city(self):
@@ -87,6 +88,8 @@ class Database:
             city_name = self.translate_city_name_from_couch_to_ui(item.key)
             if city_name not in cities:
                 cities[city_name] = item.value
+        print("median income")
+        print(cities)
         return cities
 
     def get_non_school_qualifications_by_city(self):
@@ -103,6 +106,8 @@ class Database:
             city_name = self.translate_city_name_from_couch_to_ui(item.key)
             if city_name not in cities:
                 cities[city_name] = item.value
+        print("unemployment")
+        print(cities)
         return cities
 
     def fetch_view(self, view: str):
@@ -147,6 +152,8 @@ def testdata():
     # http://haliax.local:5001/testdata?xattr=foo&yattr=bar&tag=a&tag=b&tag=c
 
     xdata = local_db.fetch_view(xattr)
+    print("XDATA")
+    print(xdata)
     ydata = local_db.fetch_view(yattr)
 
     data = [
