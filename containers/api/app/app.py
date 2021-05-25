@@ -45,7 +45,7 @@ class Database:
         }
 
     def translate_city_name_from_couch_to_ui(self, name):
-        name = name.lower().removeprefix('greater').strip()
+        name = name.lower().removeprefix('greater').removesuffix('(wa)').strip()
         known_cities = {
             'melbourne',
             'sydney',
@@ -55,6 +55,7 @@ class Database:
             'darwin',
             'australian capital territory',
             'perth',
+            'canberra'
         }
         if name not in known_cities:
             return None
