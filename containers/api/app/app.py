@@ -26,7 +26,7 @@ remote_couch = couchdb.Server(couch_url)
 remote_couch.resource.session.disable_ssl_verification()
 
 def twitter_db():
-    return remote_couch['db_small_twitter']
+    return remote_couch['tweets_db']
 def income_db():
     return remote_couch['aurin_income']
 def employment_db():
@@ -69,7 +69,7 @@ class Database:
     def get_word_lengths_by_city(self):
         cities = {}
         word_lengths_by_city = {}
-        for item in twitter_db().view('wordLengths/new-view', group=True):
+        for item in twitter_db().view('word-lengths/new-view', group=True):
             if item.key[0] in cities:
                 cities[item.key[0]]['total_word_length'] += item.value * item.key[1]
                 cities[item.key[0]]['tweet_count'] += item.value
@@ -77,8 +77,9 @@ class Database:
                 cities[item.key[0]] = {'total_word_length': item.value * item.key[1], 'tweet_count': item.value}
 
         for city_name in cities.keys():
-            word_lengths_by_city[city_name] = cities[city_name]['total_word_length'] / cities[city_name]['tweet_count']
-        
+            word_lengths_by_city[self.translate_city_name_from_couch_to_ui(city_name)] = cities[city_name]['total_word_length'] / cities[city_name]['tweet_count']
+        print("word_lengths_by_city")
+        print(word_lengths_by_city)
         return word_lengths_by_city
 
     def get_median_income_by_city(self):
@@ -87,6 +88,8 @@ class Database:
             city_name = self.translate_city_name_from_couch_to_ui(item.key)
             if city_name not in cities:
                 cities[city_name] = item.value
+        print("median income")
+        print(cities)
         return cities
 
     def get_non_school_qualifications_by_city(self):
@@ -103,6 +106,8 @@ class Database:
             city_name = self.translate_city_name_from_couch_to_ui(item.key)
             if city_name not in cities:
                 cities[city_name] = item.value
+        print("unemployment")
+        print(cities)
         return cities
 
     def fetch_view(self, view: str):
@@ -145,6 +150,8 @@ def chartdata():
     print(f'yattr: {yattr}')
 
     xdata = local_db.fetch_view(xattr)
+    print("XDATA")
+    print(xdata)
     ydata = local_db.fetch_view(yattr)
 
     data = [
