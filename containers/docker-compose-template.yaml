@@ -13,7 +13,6 @@ services:
     image: {{registry_address_port}}/nginx_wrapper:latest
     build: ./nginx
     ports:
-      - 5984:5984
       - 6984:6984
       - 80:80
       - 443:443
