@@ -213,15 +213,8 @@ def mapdata():
                 for city, city_data in xdata.items()]
             }
     }
-
-    data = {city.capitalize(): x for city, x in xdata.items()}
     
-    response = jsonify({
-        'geodata': geodata,
-        'data': data,
-        'cities': ['Canberra', 'Melbourne', 'Sydney', 'Brisbane', 
-                   'Darwin', 'Perth', 'Adelaide', 'Hobart']
-    })
+    response = jsonify({'geodata': geodata})
 
     response.headers.add('Access-Control-Allow-Origin', '*')
 
