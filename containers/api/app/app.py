@@ -141,7 +141,7 @@ def graphkeys():
 
     return response
 
-@app.route('/testdata')
+@app.route('/chartdata')
 def testdata():
     xattr = request.args.get('xattr') or 'unemployment_pct_by_city'
     yattr = request.args.get('yattr') or 'word_lengths_by_city'
