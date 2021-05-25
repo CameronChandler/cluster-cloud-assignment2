@@ -68,6 +68,8 @@ if __name__ == '__main__':
     COUCHDB_HOST = environ['COUCHDB_HOST']
 
     couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:5984/'
+    # use 5984 in container cluster
+    # use 6984 on local machine
 
     remote_couch = couchdb.Server(couch_url)
     # remote_couch.resource.session.disable_ssl_verification()
