@@ -12,7 +12,7 @@ import hashlib
 import uuid
 import jinja2
 
-from couchdb_setup import generate_design_docs
+from couchdb_setup import generate_design_docs, ingest
 
 from log import *
 
@@ -25,7 +25,8 @@ PATHS = {
   'clouds': path.join(ROOT, 'clouds.yaml'),
   'stack': path.join(ROOT, 'containers'),
   'nginx': path.join(ROOT, 'containers', 'nginx', 'config'),
-  'frontend': path.join(ROOT, 'containers', 'nginx', 'frontend')
+  'frontend': path.join(ROOT, 'containers', 'nginx', 'frontend'),
+  'data': path.join(ROOT, 'couchdb_setup', 'ingest', 'res'),
 }
 
 
@@ -223,7 +224,6 @@ class Orchestrator:
 
         stdout, _ = proc.communicate()
         stdout = stdout.decode()
-        error(stdout)
         stdout = json.loads(stdout)
         for k in stdout:
           stdout[k] = json.loads(stdout[k])
@@ -469,6 +469,13 @@ class Orchestrator:
   @traced()
   def try_first_time_db_setup(self):
     with chdir('couchdb_setup'):
+      ingest(
+        host=self.manager,
+        port=6984,
+        user=self.__couch_config.username,
+        password=self.__couch_config.password,
+        data_dir=self.__paths['data'],
+      )
       generate_design_docs(
         host=self.manager,
         port=6984,
