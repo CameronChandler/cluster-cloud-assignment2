@@ -1,2 +1,4 @@
 __pycache__
 containers/docker-compose.yaml
+.idea/*
+venv/*
