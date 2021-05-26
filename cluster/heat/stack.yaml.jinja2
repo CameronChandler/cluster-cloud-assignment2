@@ -103,16 +103,16 @@ resources:
           port_range_min: 6984
           port_range_max: 6984
 
-  
-  manager:
+  {% for name, tags in nodes.items() %}
+  {{name}}:
     type: OS::Nova::Server
     properties:
       key_name: { get_param: key_name }
       image: { get_param: image }
       flavor: { get_param: flavor }
       tags: [
-        'docker-manager',
-        
+        {% for tag in  tags %}'{{tag}}',
+        {% endfor %}
       ]
       availability_zone: { get_param: availability_zone }
       security_groups:
@@ -123,94 +123,30 @@ resources:
       - { get_resource: docker_registry_secgroup }
       networks:
         - allocate_network: auto
-  manager_vol:
+  {{name}}_vol:
     type: OS::Cinder::Volume
     properties:
-      size: 20
+      size: 60
       availability_zone: { get_param: availability_zone }
-  manager_vol_attachment:
+  {{name}}_vol_attachment:
     type: OS::Cinder::VolumeAttachment
     properties:
-      instance_uuid: { get_resource: manager }
-      volume_id: { get_resource: manager_vol }
-  
-  worker0:
-    type: OS::Nova::Server
-    properties:
-      key_name: { get_param: key_name }
-      image: { get_param: image }
-      flavor: { get_param: flavor }
-      tags: [
-        'docker-worker',
-        
-      ]
-      availability_zone: { get_param: availability_zone }
-      security_groups:
-      - { get_resource: ssh_secgroup }
-      - { get_resource: docker_swarm_secgroup }
-      - { get_resource: couchdb_secgroup }
-      - { get_resource: http_secgroup }
-      - { get_resource: docker_registry_secgroup }
-      networks:
-        - allocate_network: auto
-  worker0_vol:
-    type: OS::Cinder::Volume
-    properties:
-      size: 20
-      availability_zone: { get_param: availability_zone }
-  worker0_vol_attachment:
-    type: OS::Cinder::VolumeAttachment
-    properties:
-      instance_uuid: { get_resource: worker0 }
-      volume_id: { get_resource: worker0_vol }
-  
-  worker1:
-    type: OS::Nova::Server
-    properties:
-      key_name: { get_param: key_name }
-      image: { get_param: image }
-      flavor: { get_param: flavor }
-      tags: [
-        'docker-worker',
-        
-      ]
-      availability_zone: { get_param: availability_zone }
-      security_groups:
-      - { get_resource: ssh_secgroup }
-      - { get_resource: docker_swarm_secgroup }
-      - { get_resource: couchdb_secgroup }
-      - { get_resource: http_secgroup }
-      - { get_resource: docker_registry_secgroup }
-      networks:
-        - allocate_network: auto
-  worker1_vol:
-    type: OS::Cinder::Volume
-    properties:
-      size: 20
-      availability_zone: { get_param: availability_zone }
-  worker1_vol_attachment:
-    type: OS::Cinder::VolumeAttachment
-    properties:
-      instance_uuid: { get_resource: worker1 }
-      volume_id: { get_resource: worker1_vol }
-  
+      instance_uuid: { get_resource: {{name}} }
+      volume_id: { get_resource: {{name}}_vol }
+  {% endfor %}
 
 outputs:
   ips:
     description: The node IP addresses
     value: {
       list_join: [',', [
-        { get_resource: manager_vol },
-        { get_resource: worker0_vol },
-        { get_resource: worker1_vol },
-        
+        {% for name, tags in nodes.items() %}{ get_resource: {{name}}_vol },
+        {% endfor %}
       ]]
     }
   vols:
     description: The uuid of the nodes volumes
     value: { list_join: [',', [
-      { get_resource: manager_vol },
-      { get_resource: worker0_vol },
-      { get_resource: worker1_vol },
-      
+      {% for name, tags in nodes.items() %}{ get_resource: {{name}}_vol },
+      {% endfor %}
     ]]}
