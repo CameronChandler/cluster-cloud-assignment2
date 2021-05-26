@@ -12,7 +12,6 @@ The system can be set up by running the `node_up.py` script. This script runs th
 
 The `os-cloud` argument refers to which cloud project we choose to use. The options are one of the projects defined in `clouds.yaml` file.
 
-
 ```--os-stack, default='stack'```
 
 The `os-stack` argument refers to the name of the OpenStack stack that is to be created on the user's cloud.
@@ -32,7 +31,6 @@ The `os-keypair-name` argument refers to the path to the user's private key in t
 
 The `couch-user` and `couch-password` arguments set up the username and password required to access to the CouchDB instance to be deployed.
 
-
 ```--couch-secret, default='<default secret>'```
 
 Each CouchDB cluster needs to have their own `couch-secret`. It serves as an additional safeguard against malicious users taking control of the CouchDB cluster.
@@ -40,7 +38,6 @@ Each CouchDB cluster needs to have their own `couch-secret`. It serves as an add
 For example, if the user's key pair name in their Nectar cloud is `my-name`, an example of a command line to run `node-up.py` would be:
 
 ```python3 node-up.py --os-keypair-name my-name```
-
 
 In addition to the command-line arguments, the script makes use of the OpenStack command-line interface, and requires that a file named `clouds.yaml` that contains details for the used OpenStack project  is present in the working directory.
 
@@ -108,7 +105,6 @@ The endpoints supported include:
 /graphkeys?attr={yattr}
 ```
 
-Details about each endpoint is elaborated in Section 3.5. Frontend.
 ### Frontend Application
 
 Firstly, the `npm install` is run to install all required packages and dependencies.
