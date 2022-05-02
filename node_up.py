@@ -61,10 +61,16 @@ def gen_argparser():
   parser.add_argument('--os-stack', default='stack')
   parser.add_argument('--os-keypair-name')
   parser.add_argument('--os-keypair-path', default='~/.ssh/id_rsa')
+  parser.add_argument('--os-worker-count', default=2)
 
   parser.add_argument('--couch-user', default='admin')
   parser.add_argument('--couch-password', default='answering_railcar')
   parser.add_argument('--couch-secret', default='a192aeb9904e6590849337933b000c99')
+
+  parser.add_argument('--tweepy_consumer_key', default='GpHUJkZ7ommomERtumdM642Go')
+  parser.add_argument('--tweepy_consumer_secret', default='yJjv9DMryDSYeYjTSkiAHARQcwpBgg4Msn58pIZVamrsbPYQlf')
+  parser.add_argument('--tweepy_access_token', default='1387016014576066562-XNwliXgab5QMNE7Z3OrJ97lgLz4SJU')
+  parser.add_argument('--tweepy_token_secret', default='4aDNS6sJ7ApDQ0HKYbNzZLIui3Ko8bpivVyOaQZ4woeKE')
 
   return parser
 
@@ -95,6 +101,8 @@ class OpenStackConfig:
   stack_key_pair_name: str
   stack_key_pair_path: str
 
+  worker_count: int
+
   def from_args(args):
     return OpenStackConfig(
       cloud_name=args.os_cloud,
@@ -103,6 +111,7 @@ class OpenStackConfig:
       stack_name=args.os_stack,
       stack_key_pair_name=args.os_keypair_name,
       stack_key_pair_path=args.os_keypair_path,
+      worker_count=args.os_worker_count,
     )
 
 @dataclass
@@ -119,23 +128,52 @@ class DockerConfig:
       stack_name='test'
     )
 
+@dataclass
+class TweepyConfig:
+  '''
+  A data class used to model Tweepy configuration
+  '''
+  consumer_key: str
+  consumer_secret: str
+  access_token: str
+  token_secret: str
+
+  def from_args(args):
+    return TweepyConfig(
+      consumer_key=args.tweepy_consumer_key,
+      consumer_secret=args.tweepy_consumer_secret,
+      access_token=args.tweepy_access_token,
+      token_secret=args.tweepy_token_secret,
+    )
+
 class Orchestrator:
   '''
   This is the main class used to interact with the configured machines.
   Includes functionality for orchestrating the OpenStack VMs, Docker Swarm, and the services that run on the swarm.
   '''
-  def __init__(self, paths, os_config: OpenStackConfig, docker_config: DockerConfig, couch_config: CouchConfig):
+  def __init__(self, paths, os_config: OpenStackConfig, docker_config: DockerConfig, couch_config: CouchConfig, tweepy_config: TweepyConfig):
     # Immutable stuff
     self.__paths = paths
     self.__os_config = os_config
     self.__docker_config = docker_config
     self.__couch_config = couch_config
+    self.__tweepy_config = tweepy_config
 
     # Stateful stuff
     self.__known_stacks = None
     self.__stack_outputs = None
     self.__manager = None
     self.__workers = []
+
+  def jinja2_gen_templates(self, templates, vars):
+    for searchpath in templates:
+      loader = jinja2.FileSystemLoader(searchpath=searchpath)
+      env = jinja2.Environment(loader=loader)
+      for (output, template) in templates[searchpath].items():
+        template = env.get_template(template)
+        compose = template.render(vars)
+        with open(path.join(searchpath, output), 'w') as f:
+          f.write(compose)
 
   def openstack_stack_exists(self, name):
     '''
@@ -164,18 +202,31 @@ class Orchestrator:
       self.__known_stacks = { s['Stack Name'] : s for s in js }
     return name in self.__known_stacks
 
+  def generate_openstack_config(self):
+    self.jinja2_gen_templates(
+      {
+        self.__paths['heat'] : { 'stack.yaml' : 'stack.yaml.jinja2'},
+      },
+      {
+        'nodes' : { 'manager' : ['docker-manager'] } | {f'worker{i}' : ['docker-worker'] for i in range(self.__os_config.worker_count) }
+      }
+    )
+
   def openstack_create_or_update_stack(self):
     '''
     Creates or updates the OpenStack stack (set of VMs and other resources), using an
     OpenStack Heat template.
     '''
+
+    self.generate_openstack_config()
+
     action = 'create'
     if self.openstack_stack_exists(self.__os_config.stack_name):
       action = 'update'
       if input('Stack already exists, update it? (y/n): ') != 'y':
         return
 
-    template = path.join(self.__paths['heat'], f'{self.__os_config.stack_name}.yaml')
+    stack_definition = path.join(self.__paths['heat'], f'{self.__os_config.stack_name}.yaml')
 
     trace(f'{"updating" if action == "update" else "creating"} stack {self.__os_config.stack_name}')
     cmd = [
@@ -184,7 +235,7 @@ class Orchestrator:
       'stack', action,
       '-f', 'json',
       '--wait',
-      '-t', template,
+      '-t', stack_definition,
       self.__os_config.stack_name,
       '--parameter', f'key_name={self.__os_config.stack_key_pair_name}'
     ]
@@ -229,8 +280,10 @@ class Orchestrator:
           stdout[k] = json.loads(stdout[k])
         self.__stack_outputs = stdout
 
-        self.__manager = self.__stack_outputs['manager_ip']['output_value']
-        self.__workers = self.__stack_outputs['worker_ips']['output_value'].split(',')
+        ips = self.__stack_outputs['ips']['output_value'].split(',')
+
+        self.__manager = ips[0]
+        self.__workers = ips[1:]
     
     return self.__stack_outputs
 
@@ -358,7 +411,7 @@ class Orchestrator:
   @property
   def docker_registry_address_port(self):
     return ':'.join([self.manager, '4000'])
-  
+
 
   @prompt('Generate templated configuration files')
   @traced('Generating templated configuration files')
@@ -370,29 +423,19 @@ class Orchestrator:
     from being accidentally committed and publically shared.
     '''
     templates = {
-      self.__paths['stack'] : {
-        'docker-compose.yaml' : 'docker-compose.yaml.jinja2'
-      },
-      self.__paths['nginx'] : {
-        'couch.conf': 'couch.conf.jinja2'
-      }
+      self.__paths['stack'] : { 'docker-compose.yaml' : 'docker-compose.yaml.jinja2' },
+      self.__paths['nginx'] : { 'couch.conf': 'couch.conf.jinja2' }
     }
     nodes = [self.manager, *self.workers]
-    for searchpath in templates:
-      loader = jinja2.FileSystemLoader(searchpath=searchpath)
-      env = jinja2.Environment(loader=loader)
-      for (output, template) in templates[searchpath].items():
-        template = env.get_template(template)
-        compose = template.render({
-          'couchdb_nodes': [f'couch{i}' for i in range(len(self.workers + [self.manager]))],
-          'docker_nodes' : nodes,
-          'couchdb_username' : self.__couch_config.username,
-          'couchdb_password' : self.__couch_config.password,
-          'couchdb_secret' : self.__couch_config.secret,
-          'registry_address_port': self.docker_registry_address_port,
-        })
-        with open(path.join(searchpath, output), 'w') as f:
-          f.write(compose)
+    self.jinja2_gen_templates(templates, {
+      'couchdb_nodes': [f'couch{i}' for i in range(len(self.workers + [self.manager]))],
+      'docker_nodes' : nodes,
+      'couchdb_username' : self.__couch_config.username,
+      'couchdb_password' : self.__couch_config.password,
+      'couchdb_secret' : self.__couch_config.secret,
+      'registry_address_port': self.docker_registry_address_port,
+    })
+
 
   @prompt('Build containers')
   @traced()
@@ -423,8 +466,6 @@ class Orchestrator:
     docker context, then uses `docker stack` to deploy services and other resources onto that swarm.
     '''
     with chdir(self.__paths['stack']):
-      subprocess.call(['docker', 'stack', 'rm', self.__docker_config.stack_name])
-
       subprocess.call([
         'docker',
         'stack',
@@ -489,6 +530,44 @@ class Orchestrator:
     with chdir(self.__paths['frontend']):
       subprocess.call(['npm', 'run', 'build'])
 
+
+  @prompt('Run harvester')
+  @traced()
+  def run_harvester(self):
+    with chdir(self.__paths['stack']):
+      subprocess.call([
+        'docker',
+        'build',
+        '--build-arg', 'http_proxy=http://wwwproxy.unimelb.edu.au:8000',
+        '--build-arg', 'https_proxy=http://wwwproxy.unimelb.edu.au:8000',
+        '-t', 'comp90024/harvest',
+        'harvest'
+      ])
+      subprocess.call(['docker', 'stop', 'harvester'])
+      subprocess.call(['docker', 'rm', 'harvester'])
+      subprocess.call([
+        'docker',
+        'create',
+        '--network', '_'.join([self.__docker_config.stack_name, 'couch']),
+        '--env', f'TWEEPY_CONSUMER_KEY={self.__tweepy_config.consumer_key}',
+        '--env', f'TWEEPY_CONSUMER_SECRET={self.__tweepy_config.consumer_secret}',
+        '--env', f'TWEEPY_ACCESS_TOKEN={self.__tweepy_config.access_token}',
+        '--env', f'TWEEPY_TOKEN_SECRET={self.__tweepy_config.token_secret}',
+        '--env', f'COUCHDB_USER={self.__couch_config.username}',
+        '--env', f'COUCHDB_PASSWORD={self.__couch_config.password}',
+        '--env', f'COUCHDB_HOST=nginx.',
+        '--env', f'HARVESTER_TARGET_DB=tweets_db',
+        '--env', f'https_proxy=http://wwwproxy.unimelb.edu.au:8000',
+        '--env', f'http_proxy=http://wwwproxy.unimelb.edu.au:8000',
+        '--env', f'HTTPS_PROXY=http://wwwproxy.unimelb.edu.au:8000',
+        '--env', f'HTTP_PROXY=http://wwwproxy.unimelb.edu.au:8000',
+
+        '--name', 'harvester',
+        'comp90024/harvest'
+      ])
+
+      subprocess.call(['docker', 'start', 'harvester'])
+
 def main():
   parser = gen_argparser()
   args = parser.parse_args()
@@ -498,19 +577,21 @@ def main():
     paths=PATHS,
     os_config=os_config,
     docker_config=DockerConfig.from_os_config(os_config),
-    couch_config=CouchConfig.from_args(args)
+    couch_config=CouchConfig.from_args(args),
+    tweepy_config=TweepyConfig.from_args(args),
   )
 
-  client.openstack_create_or_update_stack()
-  client.write_hosts_file()
-  client.ansible_init_unimelb_proxy()
-  client.ansible_bootstrap()
-  client.docker_setup_remote_context()
-  client.build_frontend()
-  client.build_docker_stack()
-  client.docker_deploy_stack()
-  client.link_couch()
-  client.try_first_time_db_setup()
+  # client.openstack_create_or_update_stack()
+  # client.write_hosts_file()
+  # client.ansible_init_unimelb_proxy()
+  # client.ansible_bootstrap()
+  # client.docker_setup_remote_context()
+  # client.build_frontend()
+  # client.build_docker_stack()
+  # client.docker_deploy_stack()
+  # client.link_couch()
+  # client.try_first_time_db_setup()
+  client.run_harvester()
 
 if __name__ == '__main__':
   main()

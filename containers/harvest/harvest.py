@@ -4,11 +4,16 @@ import json
 
 from os import environ
 
+COUCHDB_USER = environ['COUCHDB_USER']
+COUCHDB_PASSWORD = environ['COUCHDB_PASSWORD']
+COUCHDB_HOST = environ['COUCHDB_HOST']
+
+HARVESTER_TARGET_DB = environ['HARVESTER_TARGET_DB']
+
 TWEEPY_CONSUMER_KEY = environ['TWEEPY_CONSUMER_KEY']
 TWEEPY_CONSUMER_SECRET = environ['TWEEPY_CONSUMER_SECRET']
 TWEEPY_ACCESS_TOKEN = environ['TWEEPY_ACCESS_TOKEN']
 TWEEPY_TOKEN_SECRET = environ['TWEEPY_TOKEN_SECRET']
-
 
 class TwitterAuth:
     # This class handles functions and attributes for authenticating twitter api
@@ -31,6 +36,7 @@ class TwitterStreamer:
         listener = TwitterListener()
         auth = self.twitter_auth.get_twitter_auth()  # get authentication object from Auth Class
         stream = tweepy.Stream(auth, listener)  # initialise streaming
+        print('harvester will listen')
         stream.filter(locations=[113.6594, -43.00311, 153.61194, -12.46113],
                       languages=["en"])  # only getting tweets from within australia and tweets in english
 
@@ -46,7 +52,8 @@ class TwitterListener(tweepy.StreamListener):
                 # check if data entry is a retweet as we don't want retweets
                 remote_tweet_db.save(data_entry)  # save tweet into database
                 streamer.harvest_count += 1
-            return True
+                print(f'{streamer.harvest_count}')
+            return streamer.harvest_count < 50000
 
         except BaseException as e:
             print("Error on data: ", str(e))
@@ -63,20 +70,17 @@ class TwitterListener(tweepy.StreamListener):
 if __name__ == '__main__':
     # main function
 
-    COUCHDB_USER = environ['COUCHDB_USER']
-    COUCHDB_PASSWORD = environ['COUCHDB_PASSWORD']
-    COUCHDB_HOST = environ['COUCHDB_HOST']
-
-    couch_url = f'http://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:5984/'
+    print('starting harvester')
+    couch_url = f'https://{COUCHDB_USER}:{COUCHDB_PASSWORD}@{COUCHDB_HOST}:6984/'
 
     remote_couch = couchdb.Server(couch_url)
-    # remote_couch.resource.session.disable_ssl_verification()
-    # when using port 6984 when ssl is involved
+    # nginx reverse proxy uses a self-signed certificate
+    remote_couch.resource.session.disable_ssl_verification()
 
     streamer = TwitterStreamer()
 
     try:
-        remote_tweet_db = remote_couch['tweets_db']  # get tweets database
+        remote_tweet_db = remote_couch[HARVESTER_TARGET_DB]  # get tweets database
         db_doc_count = remote_tweet_db.info()['doc_count']  # get total document count of remote database
 
     except BaseException as e:
